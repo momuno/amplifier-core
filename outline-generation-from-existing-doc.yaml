@@ -1,0 +1,854 @@
+name: "outline-generation-from-existing-doc"
+description: "Generate documentation outline by analyzing existing document and discovering source files"
+version: "1.0.0"
+tags: ["documentation", "outline-generation", "source-analysis", "dag-validation"]
+
+# Recipe mode: staged (includes approval gates)
+# This enables human-in-loop review at critical decision points
+
+context:
+  # Required: Path to document to generate outline for
+  target_doc: ""  # e.g., "docs/DESIGN_PHILOSOPHY.md"
+  
+  # Optional: Array of external repos to check (auto-detect if not provided)
+  external_repos: []  # e.g., ["amplifier-foundation"]
+  
+  # Optional: Working directory for artifacts
+  working_dir: ".doc-gen"
+
+# Recursion protection
+recursion:
+  max_depth: 2
+  max_total_steps: 100
+
+# ==============================================================================
+# STAGE 1: DOCUMENT ANALYSIS
+# Purpose: Extract essence, purpose, and scope of target document
+# ==============================================================================
+stages:
+  - name: "document-analysis"
+    description: "Analyze target document to understand its purpose and scope"
+    
+    steps:
+      - id: "validate-target-exists"
+        agent: "foundation:zen-architect"
+        mode: "ANALYZE"
+        prompt: |
+          Verify that the target document exists at: {{target_doc}}
+          
+          Use read_file to check if the file exists and is readable.
+          If it doesn't exist, report an error with the exact path that was checked.
+          If it exists, report success with the file size and line count.
+        output: "target_validation"
+        timeout: 120
+        on_error: "fail"
+      
+      - id: "read-target-document"
+        agent: "foundation:zen-architect"
+        mode: "ANALYZE"
+        prompt: |
+          Read the complete target document: {{target_doc}}
+          
+          Capture the full content for analysis in subsequent steps.
+        output: "target_content"
+        timeout: 300
+        on_error: "fail"
+      
+      - id: "extract-document-essence"
+        agent: "foundation:zen-architect"
+        mode: "ANALYZE"
+        prompt: |
+          Analyze the target document and extract:
+          
+          1. **Purpose**: What is this document about? (1-2 sentences)
+          2. **Scope**: What topics/concepts does it cover?
+          3. **Essence**: What is the main point it communicates?
+          4. **Document Type**: Is this technical reference, explanatory synthesis, or overview?
+          5. **Key Sections**: List the main heading structure
+          
+          Document content:
+          {{target_content}}
+          
+          Provide a concise summary that captures the document's intent.
+        output: "document_analysis"
+        timeout: 600
+        on_error: "fail"
+
+  # ==============================================================================
+  # STAGE 2: REPOSITORY SCAN
+  # Purpose: Build comprehensive understanding of all available source material
+  # ==============================================================================
+  - name: "repository-scan"
+    description: "Scan current repository and external repos for potential source files"
+    
+    steps:
+      - id: "find-repo-files"
+        agent: "foundation:zen-architect"
+        mode: "ANALYZE"
+        prompt: |
+          Discover all files in the current repository that could be potential sources.
+          
+          Use glob or bash to find:
+          - All markdown files (*.md)
+          - Documentation files (docs/*, context/*)
+          - Specification files (specs/*)
+          - README files
+          - Configuration files that might contain documentation
+          
+          Exclude:
+          - node_modules/
+          - .venv/
+          - .git/
+          - __pycache__/
+          - build/
+          - dist/
+          - .doc-gen/staging/ (generated files)
+          
+          Output a structured list of file paths grouped by type.
+        output: "repo_file_list"
+        timeout: 300
+        on_error: "fail"
+      
+      - id: "detect-external-repos"
+        agent: "foundation:zen-architect"
+        mode: "ANALYZE"
+        prompt: |
+          Detect external repositories that might contain source material.
+          
+          Check:
+          1. User-provided repos: {{external_repos}}
+          2. Loaded bundles in ~/.amplifier/cache/
+          3. Foundation bundle (amplifier-foundation)
+          
+          For each detected external repo:
+          - Get the full path
+          - Get the commit hash (git rev-parse HEAD)
+          - List key documentation files
+          
+          If no external repos provided and none detected, note that and continue with current repo only.
+        output: "external_repos_detected"
+        timeout: 300
+        on_error: "continue"
+      
+      - id: "get-current-repo-commit"
+        agent: "foundation:zen-architect"
+        mode: "ANALYZE"
+        prompt: |
+          Get the current commit hash for this repository.
+          
+          Run: git rev-parse HEAD
+          
+          Output the full 40-character commit hash.
+        output: "current_repo_commit"
+        timeout: 60
+        on_error: "fail"
+
+  # ==============================================================================
+  # STAGE 3: SOURCE DISCOVERY
+  # Purpose: Identify source files through evidence-based analysis
+  # ==============================================================================
+  - name: "source-discovery"
+    description: "Identify likely source files by comparing content and finding evidence"
+    
+    steps:
+      - id: "read-potential-sources"
+        agent: "foundation:zen-architect"
+        mode: "ANALYZE"
+        prompt: |
+          Read all potential source files identified in the repository scan.
+          
+          Files to read: {{repo_file_list}}
+          
+          Use parallel read_file operations where possible for efficiency.
+          Focus on documentation and specification files first.
+          
+          Build a comprehensive understanding of what content exists where.
+        output: "sources_content"
+        timeout: 900
+        on_error: "continue"
+      
+      - id: "compare-and-identify-sources"
+        agent: "foundation:zen-architect"
+        mode: "ANALYZE"
+        prompt: |
+          Compare the target document to all repository files and identify sources.
+          
+          Target document analysis:
+          {{document_analysis}}
+          
+          Repository content:
+          {{sources_content}}
+          
+          For each file, look for evidence:
+          - **Verbatim matches**: Identical or near-identical text
+          - **Structural similarity**: Same section organization
+          - **Concept alignment**: Matching terminology and definitions
+          - **Referenced content**: Examples, patterns, specifications
+          
+          Categorize sources by confidence:
+          - **Very High**: Verbatim text matches
+          - **High**: Strong concept/terminology alignment
+          - **Medium**: Related concepts that inform the document
+          - **Should Include**: Based on document scope but not clearly sourced
+          
+          For each identified source, document:
+          1. File path
+          2. Evidence of content derivation
+          3. Which sections it supports
+          4. Confidence level
+          
+          Output a structured source analysis.
+        output: "source_analysis"
+        timeout: 1200
+        on_error: "fail"
+      
+      - id: "read-external-sources"
+        agent: "foundation:zen-architect"
+        mode: "ANALYZE"
+        prompt: |
+          If external repositories were detected, check them for source material.
+          
+          External repos: {{external_repos_detected}}
+          
+          For each external repo:
+          1. Read key documentation files
+          2. Compare to target document
+          3. Identify philosophical/foundational content that appears in target
+          
+          Cross-repository synthesis is common for explanatory documents.
+          Look for foundation concepts, design patterns, architectural principles.
+          
+          If no external repos, skip this step gracefully.
+        output: "external_source_analysis"
+        timeout: 900
+        on_error: "continue"
+      
+      - id: "create-initial-source-list"
+        agent: "foundation:zen-architect"
+        mode: "ARCHITECT"
+        prompt: |
+          Create the initial comprehensive source list.
+          
+          Combine:
+          - Current repository sources: {{source_analysis}}
+          - External repository sources: {{external_source_analysis}}
+          
+          For each source:
+          ```yaml
+          - file: "path/to/file"
+            repository: "repo-name"
+            commit: "commit-hash"
+            confidence: "very-high|high|medium"
+            evidence: "Description of matching content"
+            supports_sections: ["section1", "section2"]
+          ```
+          
+          Output as structured YAML.
+        output: "initial_source_list"
+        timeout: 600
+        on_error: "fail"
+
+  # ==============================================================================
+  # STAGE 4: CIRCULAR REFERENCE DETECTION (APPROVAL GATE)
+  # Purpose: Ensure source tree is a DAG with no cycles
+  # ==============================================================================
+  - name: "circular-detection"
+    description: "Detect and exclude circular references to maintain DAG structure"
+    approval_required: true
+    
+    steps:
+      - id: "find-references-to-target"
+        agent: "foundation:zen-architect"
+        mode: "ANALYZE"
+        prompt: |
+          Find all documents that reference the target document.
+          
+          Target: {{target_doc}}
+          
+          Search the repository for files that link to or reference this document:
+          - Use grep to find mentions of the filename
+          - Check README.md, index files, navigation docs
+          - Look for markdown links like [text]({{target_doc}})
+          
+          Output a list of files that reference the target.
+        output: "referencing_documents"
+        timeout: 300
+        on_error: "continue"
+      
+      - id: "analyze-abstraction-hierarchy"
+        agent: "foundation:zen-architect"
+        mode: "ANALYZE"
+        prompt: |
+          Analyze the abstraction hierarchy to determine document levels.
+          
+          Target document: {{target_doc}}
+          Document analysis: {{document_analysis}}
+          Documents referencing target: {{referencing_documents}}
+          Initial source list: {{initial_source_list}}
+          
+          For each document that references the target:
+          - Is it HIGHER level (overview, README, index)?
+          - Is it LOWER level (detailed spec, implementation)?
+          
+          **Rule**: Higher-level docs CANNOT be sources for lower-level docs.
+          
+          If a document links TO the target:
+          - The referring document is HIGHER in the tree
+          - It abstracts/summarizes content FROM the target
+          - It CANNOT be a source FOR the target (would create cycle)
+          
+          Build dependency hierarchy:
+          ```
+          Top-level (README, overview)
+              ↓ reference/abstract
+          Mid-level (explanatory docs, synthesis)
+              ↓ reference/derive
+          Leaf-level (specs, code, foundational docs)
+          ```
+        output: "hierarchy_analysis"
+        timeout: 600
+        on_error: "fail"
+      
+      - id: "identify-circular-references"
+        agent: "foundation:zen-architect"
+        mode: "ANALYZE"
+        prompt: |
+          Identify circular references that must be excluded.
+          
+          Hierarchy analysis: {{hierarchy_analysis}}
+          Initial sources: {{initial_source_list}}
+          
+          For each source in the initial list:
+          - Does it reference the target document?
+          - Is it higher in the abstraction tree?
+          - Would using it as a source create a cycle?
+          
+          Create exclusion list with detailed reasoning for each exclusion:
+          ```yaml
+          exclusions:
+            - file: "path/to/file"
+              reason: "References target document - higher in abstraction tree"
+              evidence: "Contains link to {{target_doc}}"
+              hierarchy_level: "top-level"
+          ```
+          
+          **IMPORTANT**: This exclusion list will be presented to the user for approval.
+          Provide clear, evidence-based reasoning for each exclusion.
+        output: "circular_exclusion_list"
+        timeout: 600
+        on_error: "fail"
+      
+      - id: "create-validated-source-list"
+        agent: "foundation:zen-architect"
+        mode: "ARCHITECT"
+        prompt: |
+          Create the validated source list with circular references removed.
+          
+          Initial sources: {{initial_source_list}}
+          Exclusions: {{circular_exclusion_list}}
+          
+          Remove excluded files and create final source list.
+          
+          For each remaining source:
+          - Verify no circular references
+          - Confirm hierarchy is valid (source at same or lower level)
+          - Document why it's included
+          
+          Output structured source list ready for source tree creation.
+        output: "validated_source_list"
+        timeout: 300
+        on_error: "fail"
+      
+      - id: "present-exclusions-for-approval"
+        agent: "foundation:zen-architect"
+        mode: "REVIEW"
+        prompt: |
+          Present the circular reference analysis for user review.
+          
+          **Exclusion Summary**:
+          {{circular_exclusion_list}}
+          
+          **Validated Source List**:
+          {{validated_source_list}}
+          
+          **Hierarchy Analysis**:
+          {{hierarchy_analysis}}
+          
+          Please review:
+          1. Are the exclusions correct?
+          2. Are there any sources that should be excluded but aren't?
+          3. Is the abstraction hierarchy analysis accurate?
+          
+          Provide a clear summary that explains:
+          - Why each file was excluded (circular reference, hierarchy violation)
+          - The final source count
+          - The dependency structure
+          
+          Format this for easy review and approval.
+        output: "approval_summary"
+        timeout: 300
+        on_error: "fail"
+
+  # ==============================================================================
+  # STAGE 5: SOURCE TREE CREATION
+  # Purpose: Create machine-readable record of source dependencies
+  # ==============================================================================
+  - name: "source-tree"
+    description: "Create source tree YAML documenting the dependency DAG"
+    
+    steps:
+      - id: "extract-document-metadata"
+        agent: "foundation:zen-architect"
+        mode: "ANALYZE"
+        prompt: |
+          Extract metadata for the source tree.
+          
+          Target document: {{target_doc}}
+          Document analysis: {{document_analysis}}
+          Hierarchy: {{hierarchy_analysis}}
+          
+          Extract:
+          - Document path
+          - Document type (mid-level-synthesis, leaf-node, top-level-overview)
+          - Purpose (brief description)
+          - Scope (what it covers)
+          - Referenced by (higher-level docs)
+          - References to (docs it links to)
+        output: "document_metadata"
+        timeout: 300
+        on_error: "fail"
+      
+      - id: "build-source-tree-yaml"
+        agent: "foundation:zen-architect"
+        mode: "ARCHITECT"
+        prompt: |
+          Build the source tree YAML file.
+          
+          Document metadata: {{document_metadata}}
+          Validated sources: {{validated_source_list}}
+          Exclusions: {{circular_exclusion_list}}
+          Current repo commit: {{current_repo_commit}}
+          External repos: {{external_repos_detected}}
+          
+          Structure:
+          ```yaml
+          document:
+            path: "{{target_doc}}"
+            type: "mid-level-synthesis"  # or leaf-node, top-level-overview
+            purpose: "Brief description"
+            scope: "What it covers"
+            referenced_by: [list of higher-level docs]
+            references_to: [list of docs it links to]
+          
+          sources:
+            - file: "path/to/source.md"
+              repository: "repo-name"
+              url: "https://github.com/org/repo/blob/COMMIT/path"
+              commit: "full-commit-hash"
+              type: "leaf"  # or mid-level
+              contributes: ["concept", "section", "foundation"]
+              evidence: "Why this file is a source"
+          
+          circular_analysis:
+            excluded:
+              - file: "path/to/excluded"
+                reason: "Higher in abstraction tree - would create cycle"
+                evidence: "Links to target document"
+            
+            validation_rules:
+              - "No circular references in dependency tree"
+              - "Information flows upward, references flow downward"
+              - "Source files at same or lower abstraction level"
+          
+          dependency_tree: |
+            [Create ASCII visualization of the dependency structure]
+          
+          generated:
+            date: "{{recipe.started_at}}"
+            recipe_version: "1.0.0"
+            current_commit: "{{current_repo_commit}}"
+          ```
+          
+          Ensure all commit hashes are full 40-character hashes.
+        output: "source_tree_yaml"
+        timeout: 600
+        on_error: "fail"
+      
+      - id: "write-source-tree-file"
+        agent: "foundation:zen-architect"
+        mode: "ARCHITECT"
+        prompt: |
+          Write the source tree to the file system.
+          
+          Extract the document name from: {{target_doc}}
+          - If path is "docs/DESIGN_PHILOSOPHY.md", name is "DESIGN_PHILOSOPHY"
+          
+          Target file: {{working_dir}}/source-trees/{DOC_NAME}.yaml
+          
+          Content: {{source_tree_yaml}}
+          
+          Use write_file to create the source tree YAML.
+          Create the directory if it doesn't exist.
+        output: "source_tree_path"
+        timeout: 300
+        on_error: "fail"
+
+  # ==============================================================================
+  # STAGE 6: OUTLINE GENERATION
+  # Purpose: Create structured JSON outline mapping sections to sources
+  # ==============================================================================
+  - name: "outline-generation"
+    description: "Generate the final outline JSON with section-to-source mappings"
+    
+    steps:
+      - id: "read-outline-examples"
+        agent: "foundation:zen-architect"
+        mode: "ANALYZE"
+        prompt: |
+          Read example outlines to understand the required structure.
+          
+          Read these files if they exist:
+          - .doc-gen/examples/sample-outline.json
+          - .doc-gen/examples/hooks_outline.json
+          
+          Extract:
+          - Required fields (meta, document, sections)
+          - Section schema (heading, level, prompt, sources)
+          - Source format (file URL, reasoning, commit)
+          - Nesting structure for subsections
+          
+          If examples don't exist, use this schema:
+          ```json
+          {
+            "meta": {
+              "name": "document-name",
+              "model": "claude-sonnet-4",
+              "temperature": 0.7,
+              "max_tokens": 8000,
+              "document_instruction": "Overall guidance for document generation"
+            },
+            "document": {
+              "title": "Document Title",
+              "output": "path/to/output.md",
+              "sections": [...]
+            }
+          }
+          ```
+        output: "outline_schema"
+        timeout: 300
+        on_error: "continue"
+      
+      - id: "extract-heading-structure"
+        agent: "foundation:zen-architect"
+        mode: "ANALYZE"
+        prompt: |
+          Extract the heading structure from the target document.
+          
+          Target content: {{target_content}}
+          
+          Use grep or text parsing to find all headings (lines starting with #).
+          Parse the hierarchy:
+          - # = level 1
+          - ## = level 2
+          - ### = level 3
+          - etc.
+          
+          Create a hierarchical structure showing:
+          - Heading text
+          - Level
+          - Position in document
+          - Parent section (for nesting)
+          
+          Output as structured data ready for outline generation.
+        output: "heading_structure"
+        timeout: 300
+        on_error: "fail"
+      
+      - id: "map-sections-to-sources"
+        agent: "foundation:zen-architect"
+        mode: "ANALYZE"
+        prompt: |
+          Map each section to its source files.
+          
+          Heading structure: {{heading_structure}}
+          Source analysis: {{source_analysis}}
+          Validated sources: {{validated_source_list}}
+          
+          For each section:
+          1. Identify which source files contain relevant content
+          2. Determine what each source contributes to this section
+          3. Write reasoning for why each source is included
+          4. Assign confidence/evidence level
+          
+          Use the evidence from source discovery phase.
+          
+          Output: Section → Sources mapping with reasoning
+        output: "section_source_mapping"
+        timeout: 900
+        on_error: "fail"
+      
+      - id: "create-section-prompts"
+        agent: "foundation:zen-architect"
+        mode: "ARCHITECT"
+        prompt: |
+          Create focused prompts for each section.
+          
+          Heading structure: {{heading_structure}}
+          Section-source mapping: {{section_source_mapping}}
+          Document analysis: {{document_analysis}}
+          
+          For each section, write a prompt that:
+          1. States what the section should accomplish
+          2. References specific content from sources
+          3. Defines the style/approach (technical, explanatory, etc.)
+          4. Provides context from surrounding sections
+          5. Is specific and actionable
+          
+          Keep prompts concise but complete.
+          
+          Output: Prompts for each section
+        output: "section_prompts"
+        timeout: 900
+        on_error: "fail"
+      
+      - id: "build-outline-json"
+        agent: "foundation:zen-architect"
+        mode: "ARCHITECT"
+        prompt: |
+          Build the complete outline JSON.
+          
+          Schema: {{outline_schema}}
+          Heading structure: {{heading_structure}}
+          Section-source mapping: {{section_source_mapping}}
+          Section prompts: {{section_prompts}}
+          Current commit: {{current_repo_commit}}
+          External repos: {{external_repos_detected}}
+          Document metadata: {{document_metadata}}
+          
+          Structure:
+          ```json
+          {
+            "meta": {
+              "name": "document-name",
+              "model": "claude-sonnet-4",
+              "temperature": 0.7,
+              "max_tokens": 8000,
+              "document_instruction": "Generate this document based on the source materials..."
+            },
+            "document": {
+              "title": "Document Title",
+              "output": "{{target_doc}}",
+              "sections": [
+                {
+                  "heading": "Section Title",
+                  "level": 1,
+                  "prompt": "Prompt for this section...",
+                  "sources": [
+                    {
+                      "file": "https://github.com/org/repo/blob/COMMIT/path/file.md",
+                      "reasoning": "This file provides...",
+                      "commit": "full-40-char-hash"
+                    }
+                  ],
+                  "sections": [nested subsections...]
+                }
+              ]
+            }
+          }
+          ```
+          
+          Ensure:
+          - All commit hashes are full 40-character
+          - Source URLs are properly formatted GitHub blob URLs
+          - Prompts are specific and actionable
+          - Nested sections properly represented
+          - All required fields present
+        output: "outline_json"
+        timeout: 900
+        on_error: "fail"
+      
+      - id: "write-outline-file"
+        agent: "foundation:zen-architect"
+        mode: "ARCHITECT"
+        prompt: |
+          Write the outline JSON to the file system.
+          
+          Extract document name from: {{target_doc}}
+          Convert to snake_case for filename (e.g., "design_philosophy")
+          
+          Target file: {{working_dir}}/staging/outlines/{doc_name}_outline.json
+          
+          Content: {{outline_json}}
+          
+          Use write_file to create the outline JSON.
+          Create directories if they don't exist.
+        output: "outline_path"
+        timeout: 300
+        on_error: "fail"
+
+  # ==============================================================================
+  # STAGE 7: VALIDATION
+  # Purpose: Validate all outputs and verify correctness
+  # ==============================================================================
+  - name: "validation"
+    description: "Validate generated artifacts and verify correctness"
+    
+    steps:
+      - id: "validate-json-structure"
+        agent: "foundation:zen-architect"
+        mode: "ANALYZE"
+        prompt: |
+          Validate the outline JSON structure.
+          
+          Outline path: {{outline_path}}
+          
+          Use bash to validate JSON:
+          ```bash
+          python3 -m json.tool {{outline_path}} > /dev/null && echo "✓ Valid JSON" || echo "✗ Invalid JSON"
+          ```
+          
+          Check:
+          - Valid JSON syntax
+          - All required fields present
+          - No empty prompts
+          - All sources have file, reasoning, commit
+        output: "json_validation"
+        timeout: 180
+        on_error: "fail"
+      
+      - id: "count-sections"
+        agent: "foundation:zen-architect"
+        mode: "ANALYZE"
+        prompt: |
+          Count sections in the outline and verify completeness.
+          
+          Outline: {{outline_path}}
+          Original heading count: {{heading_structure}}
+          
+          Use Python to count total sections (including nested):
+          ```python
+          import json
+          with open('{{outline_path}}') as f:
+              outline = json.load(f)
+          def count(sections):
+              return len(sections) + sum(count(s.get('sections', [])) for s in sections)
+          total = count(outline['document']['sections'])
+          print(f"Total sections: {total}")
+          ```
+          
+          Verify section count matches heading count from original document.
+        output: "section_count"
+        timeout: 120
+        on_error: "continue"
+      
+      - id: "verify-source-files-exist"
+        agent: "foundation:zen-architect"
+        mode: "ANALYZE"
+        prompt: |
+          Verify all source files exist at specified commits.
+          
+          Outline: {{outline_path}}
+          Source tree: {{source_tree_path}}
+          
+          For each source file referenced:
+          1. Extract file path from GitHub URL
+          2. Check if file exists locally
+          3. Verify commit hash is valid (git cat-file -e)
+          
+          Report any missing files or invalid commits.
+          
+          Note: Files from external repos should be checked in their cache locations.
+        output: "file_existence_check"
+        timeout: 300
+        on_error: "continue"
+      
+      - id: "verify-no-circular-references"
+        agent: "foundation:zen-architect"
+        mode: "ANALYZE"
+        prompt: |
+          Final check for circular references.
+          
+          Source tree: {{source_tree_yaml}}
+          Exclusions: {{circular_exclusion_list}}
+          
+          Verify:
+          - No source file references the target document
+          - Dependency tree is acyclic (DAG)
+          - All exclusions were properly applied
+          
+          If any circular references found, report as error.
+        output: "circular_check"
+        timeout: 180
+        on_error: "fail"
+      
+      - id: "generate-validation-report"
+        agent: "foundation:zen-architect"
+        mode: "REVIEW"
+        prompt: |
+          Generate final validation report.
+          
+          JSON validation: {{json_validation}}
+          Section count: {{section_count}}
+          File existence: {{file_existence_check}}
+          Circular check: {{circular_check}}
+          
+          Outline path: {{outline_path}}
+          Source tree path: {{source_tree_path}}
+          
+          Provide summary:
+          
+          ✅ **Success Criteria**:
+          - [ ] Source tree YAML exists
+          - [ ] No circular references
+          - [ ] All sources have commit hashes
+          - [ ] Outline JSON is valid
+          - [ ] All source files exist
+          - [ ] Section count matches document
+          - [ ] Each section has sources with reasoning
+          - [ ] Commits are current
+          
+          **Artifacts Created**:
+          1. Source tree: {{source_tree_path}}
+          2. Outline JSON: {{outline_path}}
+          
+          **Statistics**:
+          - Total sources: [count]
+          - Excluded (circular): [count]
+          - Total sections: [count]
+          - External repos: [count]
+          
+          **Next Steps**:
+          To regenerate the document using this outline:
+          ```bash
+          amplifier run "use doc-gen tool to generate document from {{outline_path}}"
+          ```
+        output: "validation_report"
+        timeout: 300
+        on_error: "continue"
+
+# ==============================================================================
+# Usage Instructions
+# ==============================================================================
+# 
+# Execute this recipe with:
+#   amplifier run "execute outline-generation-from-existing-doc.yaml with target_doc=docs/DESIGN_PHILOSOPHY.md"
+#
+# With external repos:
+#   amplifier run "execute outline-generation-from-existing-doc.yaml with target_doc=docs/DESIGN_PHILOSOPHY.md external_repos=['amplifier-foundation']"
+#
+# This recipe will:
+# 1. Analyze the target document
+# 2. Scan repositories for source files
+# 3. Identify sources through evidence-based analysis
+# 4. Detect and exclude circular references (PAUSES for approval)
+# 5. Create source tree YAML
+# 6. Generate outline JSON
+# 7. Validate all outputs
+#
+# APPROVAL GATE:
+# After circular reference detection, the recipe will pause and present
+# the exclusion list for review. You can:
+# - Approve: Continue with the validated source list
+# - Deny: Stop execution to revise the analysis
+#
+# Expected duration: 15-30 minutes depending on repository size
