@@ -1,0 +1,280 @@
+{
+  "_meta": {
+    "name": "hooks-api-outline",
+    "document_instruction": "Provide concise API reference for amplifier-core hooks with usage examples. Use code, tables, bullets, diagrams, or prose as needed to clearly explain the methods and data structures. Avoid writing lists as prose unless absolutely necessary. If the list is code related, tables often work well.",
+    "model": "claude-sonnet-4-20250514",
+    "max_response_tokens": 8000,
+    "temperature": 0.0
+  },
+  "document": {
+    "title": "# Hooks API",
+    "output": "docs/api/core/hooks.md",
+    "sections": [
+      {
+        "heading": "# Hooks API",
+        "level": 1,
+        "prompt": "Provide a concise high-level introduction for the Hooks API. State what the core components are and key capabilities. Do not provide details about usage patterns, the architecture, or anything else. These details will be covered in later sections.",
+        "sources": [
+          {
+            "file": "https://github.com/microsoft/amplifier-core/blob/main/docs/HOOKS_API.md",
+            "reasoning": "Contains the Hooks API Reference Overview explaining what hooks are.",
+            "commit": "0991d9c5d1fee3ed720c6189ae2a6f03d8689855"
+          },
+          {
+            "file": "https://github.com/microsoft/amplifier-core/blob/main/amplifier_core/hooks.py",
+            "reasoning": "Full code source for the hooks system including HookRegistry and HookResult. Analysis of this file will provide the necessary context to write a brief introduction to the topic.",
+            "commit": "e0ad0bc85d43233483fc1ce15051436c474a3042"
+          }
+        ],
+        "sections": [
+          {
+            "heading": "## HookRegistry",
+            "level": 2,
+            "prompt": "Provide a concise high-level introduction for the HookRegistry class. Include source link. List key capabilities. Show a basic HookRegistry usage example under 15 lines.",
+            "sources": [
+              {
+                "file": "https://github.com/microsoft/amplifier-core/blob/main/amplifier_core/hooks.py",
+                "reasoning": "Defines the HookRegistry class.",
+                "commit": "e0ad0bc85d43233483fc1ce15051436c474a3042"
+              }
+            ],
+            "sections": [
+              {
+                "heading": "### Methods",
+                "level": 3,
+                "prompt": "Provide a concise high-level introduction to the HookRegistry methods section. List all available methods in a Table. Then use the following template to  document each method in detail.\n\nTemplate:\n#### <Method Name>\n<Method Description>\n<code block: Method Signature including parameters and return type>\nParameters:\n<Parameters table including Parameter, Type, Default, and Description columns>\nReturns: <Return type and description>\n<Code block: Example under 15 lines>\nExecution Behavior:\n<Execution Behavior explanation>\n<Note: Any other important notes>",
+                "sources": [
+                  {
+                    "file": "https://github.com/microsoft/amplifier-core/blob/main/amplifier_core/hooks.py",
+                    "reasoning": "Contains all method implementations for HookRegistry",
+                    "commit": "e0ad0bc85d43233483fc1ce15051436c474a3042"
+                  }
+                ],
+                "sections": []
+              },
+              {
+                "heading": "### Standard Events",
+                "level": 3,
+                "prompt": "Document all standard event constants defined in HookRegistry. Organize them into three categories: Lifecycle Events, Decision Events, and Error Events. List each constant with its string value and description. Show a usage code example under 10 lines. Add a note at the end: 'Note: This section documents the core lifecycle events defined in HookRegistry. For the complete canonical event taxonomy, see amplifier_core/events.py.' Include a link to events.py in the note.",
+                "sources": [
+                  {
+                    "file": "https://github.com/microsoft/amplifier-core/blob/main/amplifier_core/hooks.py",
+                    "reasoning": "Lines 37-58 define all standard event constants as class attributes with their string values",
+                    "commit": "e0ad0bc85d43233483fc1ce15051436c474a3042"
+                  },
+                  {
+                    "file": "https://github.com/microsoft/amplifier-core/blob/main/amplifier_core/events.py",
+                    "reasoning": "Contains the complete canonical event taxonomy (desired-state) with additional events beyond HookRegistry class attributes",
+                    "commit": "e0ad0bc85d43233483fc1ce15051436c474a3042"
+                  }
+                ],
+                "sections": []
+              }
+            ]
+          },
+          {
+            "heading": "## Hook Handler",
+            "level": 3,
+            "prompt": "Document the expected format for the hook handler as it is referenced by the code. Provide any relevant information the user should be aware of when implementing their own hook handler. Includie the handler signature, parameters, return value, and implementation requirements. Include a code example under 10 lines.",
+            "sources": [
+              {
+                "file": "https://github.com/microsoft/amplifier-core/blob/main/amplifier_core/hooks.py",
+                "reasoning": "References expected hook handler signature.",
+                "commit": "e0ad0bc85d43233483fc1ce15051436c474a3042"
+              }
+            ],
+            "sections": []
+          },
+          {
+            "heading": "## HookResult",
+            "level": 2,
+            "prompt": "Provide a concise high-level introduction for the HookResult class. Include source link. List key capabilities. Show a basic HookResult usage example under 15 lines.",
+            "sources": [
+              {
+                "file": "https://github.com/microsoft/amplifier-core/blob/main/amplifier_core/hooks.py",
+                "reasoning": "Defines the HookResult class.",
+                "commit": "e0ad0bc85d43233483fc1ce15051436c474a3042"
+              }
+            ],
+            "sections": [
+              {
+                "heading": "### Actions",
+                "level": 3,
+                "prompt": "Explain what a HookResult action does. Document all action values in a table with descriptions. Include a code example under 10 lines.",
+                "sources": [
+                  {
+                    "file": "https://github.com/microsoft/amplifier-core/blob/main/amplifier_core/models.py",
+                    "reasoning": "Lines 130-138 define the action field with all possible literal values and their descriptions",
+                    "commit": "e0ad0bc85d43233483fc1ce15051436c474a3042"
+                  },
+                  {
+                    "file": "https://github.com/microsoft/amplifier-core/blob/main/docs/HOOKS_API.md",
+                    "reasoning": "Contains the actions table with descriptions and use cases for each action type",
+                    "commit": "e0ad0bc85d43233483fc1ce15051436c474a3042"
+                  }
+                ],
+                "sections": []
+              },
+              {
+                "heading": "### Fields",
+                "level": 3,
+                "prompt": "Provide a concise high-level introduction to the HookResult fields section. List all available fields in a Table, by category. Then use the following template to document each field in detail.\n\nTemplate:\n#### <Field Name>\n<Field Description>\nType: <Field Type>\nDefault: <Default Value>\n<Note: Any other important notes>",
+                "sources": [
+                  {
+                    "file": "https://github.com/microsoft/amplifier-core/blob/main/amplifier_core/models.py",
+                    "reasoning": "Lines 130-246 contain the complete HookResult field definitions with Pydantic Field annotations, types, defaults, and descriptions",
+                    "commit": "e0ad0bc85d43233483fc1ce15051436c474a3042"
+                  }
+                ],         
+                "sections": []
+              },
+              {
+                "heading": "### Examples",
+                "level": 3,
+                "prompt": "Provide a concise high-level introduction for the examples section.",
+                "sources": [
+                  {
+                    "file": "https://github.com/microsoft/amplifier-core/blob/main/docs/HOOKS_API.md",
+                    "reasoning": "Contains comprehensive pattern examples demonstrating various HookResult usage patterns",
+                    "commit": "e0ad0bc85d43233483fc1ce15051436c474a3042"
+                  }
+                ],
+                "sections": [
+                  {
+                    "heading": "#### Continue (observe only)",
+                    "level": 4,
+                    "prompt": "Show a simple example of returning HookResult for observation-only hooks. Keep it under 15 lines.",
+                    "sources": [
+                      {
+                        "file": "https://github.com/microsoft/amplifier-core/blob/main/docs/HOOKS_API.md",
+                        "reasoning": "Contains examples of continue action for observation-only hooks",
+                        "commit": "e0ad0bc85d43233483fc1ce15051436c474a3042"
+                      }
+                    ],
+                    "sections": []
+                  },
+                  {
+                    "heading": "#### Deny operation",
+                    "level": 4,
+                    "prompt": "Show an example of returning HookResult to block an operation with a reason. Keep it under 15 lines.",
+                    "sources": [
+                      {
+                        "file": "https://github.com/microsoft/amplifier-core/blob/main/docs/HOOKS_API.md",
+                        "reasoning": "Documents deny action with reason field for blocking operations",
+                        "commit": "e0ad0bc85d43233483fc1ce15051436c474a3042"
+                      }
+                    ],
+                    "sections": []
+                  },
+                  {
+                    "heading": "#### Modify event data",
+                    "level": 4,
+                    "prompt": "Show an example of returning HookResult to modify event data. Keep it under 15 lines.",
+                    "sources": [
+                      {
+                        "file": "https://github.com/microsoft/amplifier-core/blob/main/amplifier_core/hooks.py",
+                        "reasoning": "Lines 149-151 show how modify action works with data field",
+                        "commit": "e0ad0bc85d43233483fc1ce15051436c474a3042"
+                      }
+                    ],
+                    "sections": []
+                  },
+                  {
+                    "heading": "#### Inject context to agent",
+                    "level": 4,
+                    "prompt": "Show an example of returning HookResult to inject feedback into the agent's context. Keep it under 15 lines.",
+                    "sources": [
+                      {
+                        "file": "https://github.com/microsoft/amplifier-core/blob/main/docs/HOOKS_API.md",
+                        "reasoning": "Provides context injection pattern examples with complete field usage",
+                        "commit": "e0ad0bc85d43233483fc1ce15051436c474a3042"
+                      }
+                    ],
+                    "sections": []
+                  },
+                  {
+                    "heading": "#### Ephemeral context injection",
+                    "level": 4,
+                    "prompt": "Show an example of ephemeral context injection for temporary state like todo reminders. Keep it under 15 lines.",
+                    "sources": [
+                      {
+                        "file": "https://github.com/microsoft/amplifier-core/blob/main/amplifier_core/models.py",
+                        "reasoning": "Lines 163-171 document the ephemeral field for temporary injections",
+                        "commit": "e0ad0bc85d43233483fc1ce15051436c474a3042"
+                      }
+                    ],
+                    "sections": []
+                  },
+                  {
+                    "heading": "#### Request approval",
+                    "level": 4,
+                    "prompt": "Show an example of requesting user approval. Keep it under 15 lines.",
+                    "sources": [
+                      {
+                        "file": "https://github.com/microsoft/amplifier-core/blob/main/docs/HOOKS_API.md",
+                        "reasoning": "Provides approval gates pattern with production protection example",
+                        "commit": "e0ad0bc85d43233483fc1ce15051436c474a3042"
+                      }
+                    ],
+                    "sections": []
+                  },
+                  {
+                    "heading": "#### Output control only",
+                    "level": 4,
+                    "prompt": "Show an example of controlling output visibility without other actions. Keep it under 15 lines.",
+                    "sources": [
+                      {
+                        "file": "https://github.com/microsoft/amplifier-core/blob/main/docs/HOOKS_API.md",
+                        "reasoning": "Documents output control pattern for clean user experience",
+                        "commit": "e0ad0bc85d43233483fc1ce15051436c474a3042"
+                      }
+                    ],
+                    "sections": []
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "heading": "## See Also",
+            "level": 2,
+            "prompt": "Provide a concise 'See Also' section with links to related documentation and resources. Format as a bulleted list with brief descriptions. Use full GitHub URLs.",
+            "sources": [
+              {
+                "file": "https://github.com/microsoft/amplifier-core/blob/main/amplifier_core/events.py",
+                "reasoning": "Complete canonical event taxonomy",
+                "commit": "e0ad0bc85d43233483fc1ce15051436c474a3042"
+              },
+              {
+                "file": "https://github.com/microsoft/amplifier-core/blob/main/amplifier_core/approval.py",
+                "reasoning": "Approval system implementation",
+                "commit": "e0ad0bc85d43233483fc1ce15051436c474a3042"
+              },
+              {
+                "file": "https://github.com/microsoft/amplifier-core/blob/main/amplifier_core/interfaces.py",
+                "reasoning": "Complete protocol definitions including ApprovalProvider, ApprovalRequest, ApprovalResponse",
+                "commit": "e0ad0bc85d43233483fc1ce15051436c474a3042"
+              },
+              {
+                "file": "https://github.com/microsoft/amplifier-core/blob/main/amplifier_core/validation/hook.py",
+                "reasoning": "Hook validation framework for module developers",
+                "commit": "e0ad0bc85d43233483fc1ce15051436c474a3042"
+              },
+              {
+                "file": "https://github.com/microsoft/amplifier-core/blob/main/amplifier_core/testing.py",
+                "reasoning": "Testing utilities for hooks",
+                "commit": "e0ad0bc85d43233483fc1ce15051436c474a3042"
+              },
+              {
+                "file": "https://github.com/microsoft/amplifier-core/blob/main/amplifier_core/pytest_plugin.py",
+                "reasoning": "Pytest integration for hook testing",
+                "commit": "e0ad0bc85d43233483fc1ce15051436c474a3042"
+              }
+            ],
+            "sections": []
+          }
+        ]
+      }
+    ]
+  }
+}
