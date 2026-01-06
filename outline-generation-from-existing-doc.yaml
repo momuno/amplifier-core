@@ -71,6 +71,7 @@ stages:
           
           Provide a concise summary that captures the document's intent.
         output: "document_analysis"
+        parse_json: true
         timeout: 600
         on_error: "fail"
 
@@ -102,10 +103,11 @@ stages:
           - __pycache__/
           - build/
           - dist/
-          - .doc-gen/staging/ (generated files)
+          - .doc-gen/
           
           Output a structured list of file paths grouped by type.
         output: "repo_file_list"
+        parse_json: true
         timeout: 300
         on_error: "fail"
       
@@ -117,8 +119,6 @@ stages:
           
           Check:
           1. User-provided repos: {{external_repos}}
-          2. Loaded bundles in ~/.amplifier/cache/
-          3. Foundation bundle (amplifier-foundation)
           
           For each detected external repo:
           - Get the full path
@@ -127,6 +127,7 @@ stages:
           
           If no external repos provided and none detected, note that and continue with current repo only.
         output: "external_repos_detected"
+        parse_json: true
         timeout: 300
         on_error: "continue"
       
@@ -144,81 +145,420 @@ stages:
         on_error: "fail"
 
   # ==============================================================================
-  # STAGE 3: SOURCE DISCOVERY
-  # Purpose: Identify source files through evidence-based analysis
+  # STAGE 3: SOURCE DISCOVERY & VERIFICATION
+  # Purpose: Identify and VERIFY source files through evidence-based analysis
+  # Critical: Only include files that have been READ and VERIFIED to exist
   # ==============================================================================
   - name: "source-discovery"
-    description: "Identify likely source files by comparing content and finding evidence"
+    description: "Identify and verify source files exist before including in analysis"
     
     steps:
-      - id: "read-potential-sources"
+      - id: "verify-potential-sources-exist"
         agent: "foundation:zen-architect"
         mode: "ANALYZE"
         prompt: |
-          Read all potential source files identified in the repository scan.
+          **CRITICAL VALIDATION STEP**: Verify each potential source file exists.
           
-          Files to read: {{repo_file_list}}
+          Files from repository scan: {{repo_file_list}}
           
-          Use parallel read_file operations where possible for efficiency.
-          Focus on documentation and specification files first.
+          For EACH file in the list:
+          1. Use read_file to attempt reading it
+          2. If read succeeds → File EXISTS and is readable
+          3. If read fails → File is MISSING or unreadable
+          
+          Create TWO separate lists:
+          
+          **VERIFIED_FILES** (exist and readable):
+          - file_path
+          - line_count (from read_file output)
+          - status: "verified"
+          
+          **MISSING_FILES** (don't exist or unreadable):
+          - file_path
+          - error: "reason for failure"
+          - status: "missing"
+          
+          **RULE**: Only files in VERIFIED_FILES can be included as sources.
+          Files in MISSING_FILES must be EXCLUDED from all analysis.
+          
+          This is a GATING step - prevents invalid file references downstream.
+        output: "file_verification_results"
+        parse_json: true
+        timeout: 900
+        on_error: "fail"
+      
+      - id: "read-verified-sources"
+        agent: "foundation:zen-architect"
+        mode: "ANALYZE"
+        prompt: |
+          Read the content of VERIFIED files only.
+          
+          Verified files: {{file_verification_results}}
+          
+          Use read_file on each file in the VERIFIED_FILES list.
+          Do NOT attempt to read files from MISSING_FILES list.
           
           Build a comprehensive understanding of what content exists where.
-        output: "sources_content"
+          
+          For each verified file, capture:
+          - Full file path
+          - Content summary
+          - Key concepts/sections
+          - Document type (spec, guide, reference, etc.)
+        output: "verified_sources_content"
         timeout: 900
+        on_error: "continue"
+      
+      - id: "report-missing-files"
+        agent: "foundation:zen-architect"
+        mode: "ANALYZE"
+        prompt: |
+          Report on missing files for user awareness.
+          
+          Verification results: {{file_verification_results}}
+          
+          Extract the MISSING_FILES list and provide a summary:
+          - How many files were missing
+          - Which files were missing
+          - Why they might be missing (recently removed, wrong path, etc.)
+          
+          This is informational only - missing files are already excluded.
+        output: "missing_files_report"
+        timeout: 180
         on_error: "continue"
       
       - id: "compare-and-identify-sources"
         agent: "foundation:zen-architect"
         mode: "ANALYZE"
         prompt: |
-          Compare the target document to all repository files and identify sources.
+          Compare target document to VERIFIED files only and identify sources.
+          
+          **CRITICAL**: Only analyze files from VERIFIED_FILES list.
+          Do NOT include any files from MISSING_FILES list.
           
           Target document analysis:
           {{document_analysis}}
           
-          Repository content:
-          {{sources_content}}
+          Verified sources content:
+          {{verified_sources_content}}
           
-          For each file, look for evidence:
-          - **Verbatim matches**: Identical or near-identical text
-          - **Structural similarity**: Same section organization
-          - **Concept alignment**: Matching terminology and definitions
-          - **Referenced content**: Examples, patterns, specifications
+          Verification results (for reference):
+          {{file_verification_results}}
           
-          Categorize sources by confidence:
-          - **Very High**: Verbatim text matches
-          - **High**: Strong concept/terminology alignment
-          - **Medium**: Related concepts that inform the document
-          - **Should Include**: Based on document scope but not clearly sourced
+          # ==============================================================================
+          # THE INVERSE SYNTHESIS PROBLEM
+          # ==============================================================================
+          
+          **Core Principle**: Think about the INVERSE of synthesis.
+          
+          When a document synthesizes content from sources, it:
+          - Combines multiple perspectives
+          - Abstracts from concrete to conceptual
+          - Unifies different terminology into consistent language
+          - Creates new explanations from existing material
+          
+          Your task is the INVERSE: Given synthesized content, identify what sources
+          were likely combined to create it.
+          
+          **DO NOT just look for keyword matches!**
+          
+          Sources may use completely different terminology but contain the conceptual
+          material that was synthesized. For example:
+          - Document says "kernel-like architecture" 
+            → Sources might discuss "modular design", "contracts", "protocols", "interfaces"
+          - Document says "regeneration-friendly"
+            → Sources might describe "idempotent", "declarative", "stateless"
+          - Document explains a synthesized principle
+            → Sources contain the raw examples, specs, and implementation details
+          
+          # ==============================================================================
+          # KEY QUESTIONS FOR SOURCE DISCOVERY (Answer these for each section)
+          # ==============================================================================
+          
+          For each section in the target document, ask:
+          
+          1. **"What is this section really about?"** (conceptual level, not just keywords)
+             - What core concepts are being explained?
+             - What mental model is being constructed?
+             - What understanding is being built?
+          
+          2. **"What source materials would an author need to synthesize this content?"**
+             - What foundational knowledge is required?
+             - What examples or concrete instances inform this?
+             - What specifications or contracts are referenced?
+             - What philosophical/design principles underlie this?
+          
+          3. **"What different perspectives/sources might contribute to this synthesis?"**
+             - Philosophy/rationale documents (the "WHY")
+             - Specifications/contracts (the "WHAT")
+             - Implementation examples (the "HOW")
+             - Process/workflow documentation (the "WHEN/WHERE")
+             - Reference documentation (the "DETAILS")
+          
+          4. **"Are there examples, specs, or implementation docs that inform this?"**
+             - Code examples that demonstrate concepts
+             - Specifications that define behaviors
+             - Implementation files that show patterns
+             - Test files that clarify expectations
+          
+          # ==============================================================================
+          # INVERSE SYNTHESIS EXAMPLES
+          # ==============================================================================
+          
+          **Example 1: Architectural Philosophy Section**
+          
+          Target document content:
+          "Amplifier's modular design enables rapid regeneration by treating each 
+          module as an independent unit with stable interfaces."
+          
+          WRONG approach (lexical matching):
+          → Search for files containing "modular design", "regeneration", "interfaces"
+          
+          RIGHT approach (inverse synthesis):
+          → Ask: "What sources would I need to write this statement?"
+          → Identify conceptual materials:
+             - MODULAR_DESIGN_PHILOSOPHY.md (explains the "why" of modularity)
+             - module_protocol.py (defines the "what" - actual interfaces/contracts)
+             - example_modules/ (shows the "how" - concrete implementations)
+             - REGENERATION_GUIDE.md (explains the regeneration process)
+             - interface_contracts.md (specifies stability guarantees)
+          
+          These sources might use terms like "bricks", "contracts", "protocols", "composable",
+          "idempotent" instead of the exact words in the target document, but they contain
+          the raw material that was synthesized into the statement.
+          
+          **Example 2: Technical Concept Explanation**
+          
+          Target document content:
+          "The discovery protocol validates sources through pattern matching and 
+          file existence checks."
+          
+          WRONG approach:
+          → Look for files mentioning "discovery protocol", "pattern matching"
+          
+          RIGHT approach:
+          → Ask: "What implementation details inform this explanation?"
+          → Identify sources:
+             - discovery.py (implementation of the discovery mechanism)
+             - validation.py (implementation of validation checks)
+             - SOURCE_PATTERNS configuration (the actual patterns)
+             - tests/test_discovery.py (shows validation behavior)
+             - error_handling.md (explains validation failures)
+          
+          The implementation might use function names like `find_modules()` or 
+          `check_source_validity()` instead of "discovery protocol", but these
+          are the sources that enable explaining the protocol.
+          
+          # ==============================================================================
+          # MULTI-PERSPECTIVE SOURCE ANALYSIS
+          # ==============================================================================
+          
+          For EACH section in the target document, identify sources across these types:
+          
+          **1. PHILOSOPHY / RATIONALE (The "WHY")**
+          - Design philosophy documents
+          - Architecture decision records
+          - Principle explanations
+          - Motivation documents
+          - Vision/mission statements
+          
+          **2. SPECIFICATIONS / CONTRACTS (The "WHAT")**
+          - Protocol definitions
+          - Interface specifications
+          - API contracts
+          - Data structure specs
+          - Behavior definitions
+          
+          **3. IMPLEMENTATION / EXAMPLES (The "HOW")**
+          - Source code files
+          - Example implementations
+          - Reference implementations
+          - Code patterns
+          - Utility functions
+          
+          **4. PROCESS / WORKFLOWS (The "WHEN/WHERE")**
+          - Process documentation
+          - Workflow descriptions
+          - Usage guides
+          - Integration guides
+          - Best practices
+          
+          **5. REFERENCE / DETAILS (The "DETAILS")**
+          - Technical reference docs
+          - API documentation
+          - Configuration options
+          - Error catalogs
+          - Troubleshooting guides
+          
+          **6. TESTS / VALIDATION (The "PROOF")**
+          - Test files that demonstrate behavior
+          - Test cases that show expectations
+          - Validation examples
+          - Contract tests
+          
+          # ==============================================================================
+          # DISCOVERY METHODOLOGY
+          # ==============================================================================
+          
+          For each VERIFIED file, perform this analysis:
+          
+          **Step 1: Conceptual Analysis**
+          - What concepts does this file contain?
+          - What knowledge does it convey?
+          - What perspective does it provide? (why/what/how/when/details)
+          
+          **Step 2: Synthesis Mapping**
+          - Which sections of the target document could be synthesized from this?
+          - What explanations in the target draw from this file's content?
+          - Could an author have used this file as source material?
+          
+          **Step 3: Evidence Collection**
+          - Verbatim matches (direct text reuse)
+          - Conceptual alignment (same ideas, different words)
+          - Structural similarity (same organization pattern)
+          - Examples referenced (specific instances cited)
+          - Implementations demonstrated (code patterns shown)
+          - Terminology variants (different words, same meaning)
+          
+          **Step 4: Confidence Assessment**
+          Consider:
+          - How central is this file's content to the target section?
+          - Could the section be written without this file?
+          - Does this file provide unique information?
+          - Are there clear conceptual connections?
+          
+          # ==============================================================================
+          # TERMINOLOGY VARIATION AWARENESS
+          # ==============================================================================
+          
+          **CRITICAL**: Sources may use DIFFERENT terminology for the SAME concepts.
+          
+          Common variations to watch for:
+          - "modules" ↔ "bricks" ↔ "components" ↔ "units"
+          - "interfaces" ↔ "contracts" ↔ "protocols" ↔ "APIs"
+          - "discovery" ↔ "detection" ↔ "finding" ↔ "locating"
+          - "validation" ↔ "verification" ↔ "checking" ↔ "ensuring"
+          - "regeneration" ↔ "rebuilding" ↔ "recreation" ↔ "reconstruction"
+          
+          Look for conceptual matches, not just lexical matches.
+          
+          # ==============================================================================
+          # SOURCE CATEGORIZATION
+          # ==============================================================================
+          
+          Categorize sources by confidence AND by type:
+          
+          **Confidence Levels**:
+          - **Very High**: Verbatim text matches + Strong conceptual alignment
+          - **High**: Clear conceptual alignment + Supporting evidence
+          - **Medium**: Related concepts that likely informed the synthesis
+          - **Should Include**: Conceptually relevant but indirect contribution
+          
+          **Evidence Types** (can have multiple):
+          - verbatim_match: Direct text reuse
+          - conceptual_alignment: Same ideas, different expression
+          - structural_parallel: Similar organization
+          - example_source: Concrete instances cited
+          - implementation_basis: Code patterns demonstrated
+          - philosophical_foundation: Underlying principles explained
+          - specification_basis: Contracts/protocols defined
+          
+          # ==============================================================================
+          # OUTPUT FORMAT
+          # ==============================================================================
           
           For each identified source, document:
-          1. File path
-          2. Evidence of content derivation
-          3. Which sections it supports
-          4. Confidence level
           
-          Output a structured source analysis.
+          ```yaml
+          - file: "path/to/source.md"
+            verification_status: "verified-exists"
+            confidence: "very-high|high|medium|should-include"
+            source_type: "philosophy|specification|implementation|process|reference|test"
+            evidence_types: ["verbatim_match", "conceptual_alignment", ...]
+            contributes_to_sections: ["Section Name 1", "Section Name 2"]
+            synthesis_reasoning: |
+              Explain the INVERSE SYNTHESIS reasoning:
+              - What concepts from this source appear in the target?
+              - How was this source's content likely synthesized?
+              - What terminology variations exist between source and target?
+              - Why would an author need this source to write the target?
+          ```
+          
+          **OUTPUT CONSTRAINT**: Only include files that were successfully verified.
+          If a file appears relevant but is in MISSING_FILES, note it separately
+          as "suggested-but-missing" for user awareness.
+          
+          # ==============================================================================
+          # QUALITY CHECK
+          # ==============================================================================
+          
+          Before finalizing, verify:
+          - [ ] Have I considered ALL types of sources (philosophy, specs, impl, process, etc.)?
+          - [ ] Have I looked beyond keyword matches to conceptual connections?
+          - [ ] Have I identified sources that use different terminology?
+          - [ ] Have I asked "what would an author need to write this?" for each section?
+          - [ ] Have I mapped both direct and synthesized content?
+          - [ ] Am I capturing the full breadth of source material used?
         output: "source_analysis"
+        parse_json: true
         timeout: 1200
         on_error: "fail"
       
-      - id: "read-external-sources"
+      - id: "verify-external-sources-exist"
         agent: "foundation:zen-architect"
         mode: "ANALYZE"
         prompt: |
-          If external repositories were detected, check them for source material.
+          **CRITICAL VALIDATION**: Verify external repository files exist.
           
-          External repos: {{external_repos_detected}}
+          External repos detected: {{external_repos_detected}}
           
-          For each external repo:
-          1. Read key documentation files
+          If no external repos were detected, output empty lists and continue.
+          
+          For each external repo file:
+          1. Use read_file to verify it exists
+          2. If read succeeds → File EXISTS
+          3. If read fails → File is MISSING
+          
+          Create TWO lists:
+          
+          **VERIFIED_EXTERNAL_FILES**:
+          - file_path
+          - repository
+          - status: "verified"
+          
+          **MISSING_EXTERNAL_FILES**:
+          - file_path
+          - repository
+          - error: "reason"
+          - status: "missing"
+          
+          Only verified external files can be included as sources.
+        output: "external_file_verification"
+        parse_json: true
+        timeout: 600
+        on_error: "continue"
+      
+      - id: "read-verified-external-sources"
+        agent: "foundation:zen-architect"
+        mode: "ANALYZE"
+        prompt: |
+          Read VERIFIED external repository files only.
+          
+          External verification: {{external_file_verification}}
+          Target document analysis: {{document_analysis}}
+          
+          For each file in VERIFIED_EXTERNAL_FILES:
+          1. Read the content
           2. Compare to target document
           3. Identify philosophical/foundational content that appears in target
           
           Cross-repository synthesis is common for explanatory documents.
           Look for foundation concepts, design patterns, architectural principles.
           
-          If no external repos, skip this step gracefully.
+          **OUTPUT**: Only include files that were successfully verified.
+          Do NOT include files from MISSING_EXTERNAL_FILES list.
+          
+          If no external repos or all missing, output empty analysis.
         output: "external_source_analysis"
         timeout: 900
         on_error: "continue"
@@ -227,11 +567,18 @@ stages:
         agent: "foundation:zen-architect"
         mode: "ARCHITECT"
         prompt: |
-          Create the initial comprehensive source list.
+          Create the initial comprehensive source list from VERIFIED files only.
           
-          Combine:
+          **CRITICAL VALIDATION**: Only include files that were verified to exist.
+          
+          Input data:
           - Current repository sources: {{source_analysis}}
           - External repository sources: {{external_source_analysis}}
+          - File verification results: {{file_verification_results}}
+          - External verification results: {{external_file_verification}}
+          
+          **RULE**: Every file in the source list MUST have been verified to exist.
+          Cross-reference each file against the VERIFIED_FILES lists.
           
           For each source:
           ```yaml
@@ -241,10 +588,23 @@ stages:
             confidence: "very-high|high|medium"
             evidence: "Description of matching content"
             supports_sections: ["section1", "section2"]
+            verification_status: "verified-exists"
+          ```
+          
+          If the source analysis included any files that are NOT in the verified lists,
+          create a separate section:
+          ```yaml
+          suggested_but_missing:
+            - file: "path/to/missing/file"
+              reason: "File was suggested but doesn't exist"
+              note: "Referenced in target doc but file is missing"
           ```
           
           Output as structured YAML.
+          
+          **GUARANTEE**: All files in the main source list have been read and verified.
         output: "initial_source_list"
+        parse_json: true
         timeout: 600
         on_error: "fail"
 
@@ -306,6 +666,7 @@ stages:
           Leaf-level (specs, code, foundational docs)
           ```
         output: "hierarchy_analysis"
+        parse_json: true
         timeout: 600
         on_error: "fail"
       
@@ -335,6 +696,7 @@ stages:
           **IMPORTANT**: This exclusion list will be presented to the user for approval.
           Provide clear, evidence-based reasoning for each exclusion.
         output: "circular_exclusion_list"
+        parse_json: true
         timeout: 600
         on_error: "fail"
       
@@ -356,6 +718,7 @@ stages:
           
           Output structured source list ready for source tree creation.
         output: "validated_source_list"
+        parse_json: true
         timeout: 300
         on_error: "fail"
       
@@ -415,6 +778,7 @@ stages:
           - Referenced by (higher-level docs)
           - References to (docs it links to)
         output: "document_metadata"
+        parse_json: true
         timeout: 300
         on_error: "fail"
       
@@ -464,7 +828,7 @@ stages:
             [Create ASCII visualization of the dependency structure]
           
           generated:
-            date: "{{recipe.started_at}}"
+            date: "[Use current timestamp: $(date -Iseconds)]"
             recipe_version: "1.0.0"
             current_commit: "{{current_repo_commit}}"
           ```
@@ -561,6 +925,7 @@ stages:
           
           Output as structured data ready for outline generation.
         output: "heading_structure"
+        parse_json: true
         timeout: 300
         on_error: "fail"
       
@@ -584,6 +949,7 @@ stages:
           
           Output: Section → Sources mapping with reasoning
         output: "section_source_mapping"
+        parse_json: true
         timeout: 900
         on_error: "fail"
       
@@ -591,23 +957,312 @@ stages:
         agent: "foundation:zen-architect"
         mode: "ARCHITECT"
         prompt: |
-          Create focused prompts for each section.
+          Create INSTRUCTION-FOCUSED prompts for each section.
           
           Heading structure: {{heading_structure}}
           Section-source mapping: {{section_source_mapping}}
           Document analysis: {{document_analysis}}
           
-          For each section, write a prompt that:
-          1. States what the section should accomplish
-          2. References specific content from sources
-          3. Defines the style/approach (technical, explanatory, etc.)
-          4. Provides context from surrounding sections
-          5. Is specific and actionable
+          **CRITICAL**: Generate prompts that tell HOW to synthesize, NOT WHAT specific content to include.
           
-          Keep prompts concise but complete.
+          Prompts should be INSTRUCTION SETS that enable the agent to DISCOVER and SYNTHESIZE
+          relevant material from sources. They should NOT prescribe specific content, concepts,
+          metaphors, or examples that lock in current source material.
           
-          Output: Prompts for each section
+          **Core Principle**:
+          ```
+          Prompts = Instructions for synthesis + Structural templates
+          Prompts ≠ Content specifications + Count locks
+          
+          Structure (HOW to present) = ENCOURAGED ✅
+          Content/Count (WHAT/HOW MANY items) = PROHIBITED ❌
+          ```
+          
+          **Key Distinction**:
+          
+          **TEMPLATES & STRUCTURE** (Encouraged ✅):
+          - Table formats, column specifications
+          - Section organization patterns
+          - Presentation structures (lists, prose, examples)
+          - Style and tone requirements
+          
+          **CONTENT & COUNT LOCKS** (Prohibited ❌):
+          - Specific items to include
+          - Predetermined numbers ("three principles", "four scenarios")
+          - Named concepts/metaphors
+          - Exact examples or implementations
+          
+          **Design Principles**:
+          
+          1. **Structural Templates Are GOOD**
+             ✅ "Create a table covering name, association, and use case for the different scenarios"
+                → Specifies TABLE STRUCTURE (columns: name, association, use case)
+                → Says "different scenarios" (discovered from sources)
+                → Count and content come from source files
+             
+             ✅ "Present the principles as a numbered list with brief explanations"
+                → Specifies PRESENTATION FORMAT (numbered list with explanations)
+                → Says "the principles" (discovered from sources)
+                → Doesn't lock which or how many principles
+             
+             ❌ "Create a table for the three scenarios: X, Y, and Z"
+                → Locks COUNT ("three")
+                → Locks CONTENT (names specific scenarios X, Y, Z)
+             
+             ❌ "List the four core principles: mechanism vs policy, ruthless simplicity, composability, and observability"
+                → Locks COUNT ("four")
+                → Locks CONTENT (names specific principles)
+          
+          2. **Abstract Instructions, Not Content Prescriptions**
+             ✅ "Identify the central organizing principle from the philosophy sources"
+             ❌ "Include the Linux kernel metaphor as the central organizing principle"
+             
+             ✅ "Synthesize the key design themes that emerge from the sources"
+             ❌ "Include mechanism vs policy, modular design, and ruthless simplicity"
+             
+             The agent should DISCOVER "Linux kernel metaphor" and "mechanism vs policy" 
+             from the sources - not be TOLD to include them.
+          
+          3. **Conceptual Categories, Not Specific Content**
+             ✅ "Explain the discovery mechanism and how it validates sources"
+             ❌ "Explain the discover_sources() function from lines 100-115"
+             
+             ✅ "Describe the architectural principles that guide the design"
+             ❌ "Describe mechanism vs policy and separation of concerns"
+          
+          4. **Structural Guidance, Not Locked Examples**
+             ✅ "Include code examples that illustrate the key patterns"
+             ✅ "Present each pattern with: name, purpose, example, and use cases"
+                → Specifies STRUCTURE for presenting patterns
+                → Doesn't lock which patterns or how many
+             
+             ❌ "Show the ModuleSource class definition from lines 15-25"
+             ❌ "Include examples for strategy, observer, and factory patterns"
+                → Locks specific patterns
+          
+          5. **Process Instructions, Not Content Requirements**
+             ✅ "Describe how the protocol ensures validity"
+             ❌ "Describe the validate_sources() function that checks SOURCE_PATTERNS"
+             
+             ✅ "Explain the validation approach and its guarantees"
+             ❌ "Explain that validation uses regex patterns and file existence checks"
+          
+          6. **Future-Proof Synthesis Guidance**
+             ✅ "Synthesize the core principles from the philosophy sources"
+             ✅ "Present each principle with: name, description, and rationale"
+                → Specifies STRUCTURE for presenting principles
+                → Doesn't lock which principles or how many
+             
+             ❌ "Include the three principles listed in DESIGN_PHILOSOPHY.md"
+                → Locks COUNT ("three")
+                → Locks SOURCE location
+             
+             ✅ "Extract and organize the key themes that appear across sources"
+             ✅ "For each theme, provide: definition, examples, and implications"
+                → Specifies STRUCTURE for presenting themes
+                → Doesn't lock which themes, how many, or ordering
+             
+             ❌ "Cover theme A, theme B, and theme C in that order"
+                → Locks CONTENT (specific themes)
+                → Locks COUNT (three themes)
+                → Locks ORDER
+          
+          7. **Context Flow (Good - This Helps Structure)**
+             ✅ "Building on the overview from the previous section..."
+             ✅ "This sets the foundation for the validation rules section that follows"
+          
+          **Real-World Example Transformation**:
+          
+          BEFORE (Too Prescriptive - Locks In Content/Count):
+          ```
+          Establish the document's purpose and provide a compelling overview of 
+          Amplifier's architectural philosophy. Include: (1) High-level statement 
+          of Amplifier's design philosophy, (2) The Linux kernel metaphor as 
+          central organizing principle, (3) Preview of key themes: mechanism vs 
+          policy, modular design, ruthless simplicity, (4) How this philosophy 
+          enables AI-native development and regeneration.
+          ```
+          
+          AFTER (Instruction-Focused + Structural Templates):
+          ```
+          Establish the document's purpose and provide a compelling overview of 
+          Amplifier's architectural philosophy.
+          
+          Include:
+          - High-level statement of the design philosophy
+          - Identify and explain the central organizing principle
+          - Preview the key design themes that emerge from the sources
+          - Explain how this philosophy enables AI-native development and regeneration
+          
+          Style: Engaging and accessible overview
+          Tone: Compelling but grounded, suitable for technical readers
+          Structure: Clear prose with conceptual progression
+          
+          Synthesize from the philosophy sources provided.
+          ```
+          
+          Notice: The AFTER version:
+          - Lets the agent DISCOVER "Linux kernel metaphor" and "mechanism vs policy" from sources
+          - Specifies STRUCTURE (how to present: statement, principle, themes, explanation)
+          - Doesn't lock CONTENT (what specific principle or themes)
+          - Doesn't lock COUNT (how many themes)
+          - If sources evolve, the outline remains valid
+          
+          **Table Example - Structure vs Content**:
+          
+          ✅ GOOD (Structural Template):
+          ```
+          Create a comparison table with columns: Feature, Description, Benefits, Trade-offs.
+          Populate with the key features discovered in the sources.
+          ```
+          → Specifies TABLE STRUCTURE (4 columns with clear purposes)
+          → Says "key features discovered" (from sources, not predetermined)
+          → Agent determines which features and how many
+          
+          ❌ BAD (Content/Count Lock):
+          ```
+          Create a comparison table showing the three features: modularity, 
+          composability, and observability, with their descriptions and benefits.
+          ```
+          → Locks COUNT ("three features")
+          → Locks CONTENT (specific features named)
+          → Breaks regeneration when sources add/remove/rename features
+          
+          **Prompt Template Structure**:
+          
+          Each prompt should follow this structure:
+          ```
+          [What to accomplish]: Brief description of section purpose
+          
+          [What to include]:
+          - Category of information to synthesize (NOT specific content)
+          - Type of explanation needed (NOT exact points to make)
+          - Relationships to explore (NOT predetermined connections)
+          
+          [How to present it] (Structural Templates - ENCOURAGED):
+          - Format: [table with columns X, Y, Z | numbered list | prose | code examples]
+          - Organization: [comparison table | hierarchical list | conceptual flow]
+          - Elements per item: [name + description | title + example + rationale]
+          
+          [How to write it]:
+          - Style: [technical/explanatory/overview/specification]
+          - Tone: [accessible/formal/conversational/precise]
+          - Structure: [prose/lists/examples/mixed]
+          
+          [Context]:
+          - Previous section: [relationship to previous content]
+          - Next section: [what this enables for following content]
+          
+          Synthesize from the sources provided.
+          ```
+          
+          Note: "How to present it" specifies STRUCTURE (template), which is encouraged.
+          It should NOT specify WHAT items or HOW MANY items - those come from sources.
+          
+          **Required Elements for Each Prompt**:
+          
+          1. **Section Purpose**: What this section accomplishes (abstract goal)
+          2. **Content Categories**: TYPES of information to discover (not specific items)
+          3. **Synthesis Instructions**: HOW to analyze and organize (not what to say)
+          4. **Presentation Structure**: Templates for HOW to present (encouraged ✅)
+             - Table formats with column specifications
+             - List structures with element types
+             - Organization patterns (comparison, hierarchical, chronological)
+          5. **Style Guidance**: How to write (technical/explanatory/etc.)
+          6. **Tone Specification**: Voice and audience level
+          7. **Context Flow**: Links to previous/next sections
+          8. **Generic Source Reference**: "Synthesize from sources" (never specific files/lines)
+          
+          **Prohibited in Prompts** (STRICT - These Break Regeneration):
+          
+          ❌ **Content Prescriptions**:
+          - Specific metaphors/analogies by name ("Linux kernel metaphor")
+          - Specific principles by name ("mechanism vs policy", "ruthless simplicity")
+          - Predetermined themes or concepts ("include X, Y, and Z")
+          - Exact examples to use ("the git remote example")
+          - Specific terminology that may evolve ("bundles", "providers")
+          
+          ❌ **Count Locks**:
+          - Exact counts ("the three principles", "four main points", "five scenarios")
+          - Numbered prescriptions ("include (1) X, (2) Y, (3) Z")
+          - "All N items" formulations ("all seven patterns")
+          
+          ❌ **Implementation Locks**:
+          - Line numbers (e.g., "lines 45-60")
+          - Specific function/class names ("discover_sources()", "ModuleSource")
+          - File-specific references ("from DESIGN_PHILOSOPHY.md")
+          - Current implementation details ("checks SOURCE_PATTERNS")
+          
+          ❌ **Content-Specific Ordering**:
+          - Predetermined content order ("cover A, then B, then C" where A/B/C are specific items)
+          - "First X, then Y, then Z" (when X/Y/Z are named content items)
+          - Specific section names from current sources ("the 'Core Concepts' section")
+          
+          **What IS Allowed** (These Guide Synthesis):
+          
+          ✅ **Abstract Instructions**:
+          - "Identify the central organizing principle"
+          - "Synthesize the key design themes"
+          - "Explain the validation approach"
+          - "Describe the discovery mechanism"
+          
+          ✅ **Conceptual Categories**:
+          - "Architectural principles that guide the design"
+          - "Core data structures and their relationships"
+          - "Error handling strategy and guarantees"
+          - "Integration patterns and extension points"
+          
+          ✅ **Synthesis Directives**:
+          - "Extract and organize the themes that appear across sources"
+          - "Identify patterns in how validation is performed"
+          - "Compare approaches and synthesize best practices"
+          - "Build a coherent explanation from the source material"
+          
+          ✅ **Structural Templates** (ENCOURAGED):
+          - "Create a table with columns: Name, Purpose, Example, Trade-offs"
+          - "Present each pattern as: Title, Problem, Solution, Consequences"
+          - "Organize as a comparison matrix showing: Feature vs Approach A vs Approach B"
+          - "Format as a numbered list with: Principle statement, Explanation, Rationale"
+          - "Use a hierarchical structure: Category → Subcategories → Examples"
+          - "Present in chronological order: Discovery → Validation → Usage"
+          - "Structure each entry with: Definition, Code example, Use cases"
+          
+          ✅ **Presentation Ordering** (when describing HOW, not WHAT):
+          - "Present from most general to most specific"
+          - "Organize by conceptual dependency (foundation → building blocks → composition)"
+          - "Structure chronologically (lifecycle stages, processing pipeline)"
+          - "Order by frequency of use (common patterns first)"
+          - These describe HOW to order discovered content, not WHAT specific items to order
+          
+          **Why This Matters**:
+          
+          Content-prescriptive prompts break regeneration because:
+          1. Sources evolve: "mechanism vs policy" might become "interface vs implementation"
+          2. New content appears: A better metaphor might emerge in updated sources
+          3. Examples change: Code refactors make specific function names obsolete
+          4. Structure shifts: Sections reorganize, making specific references invalid
+          
+          Instruction-focused prompts enable regeneration because:
+          1. They describe WHAT TO LOOK FOR, not what to include
+          2. Agent discovers current, relevant content from sources
+          3. Outline remains valid as sources evolve
+          4. New relevant material is automatically included
+          
+          **Quality Check**:
+          
+          For each prompt you generate, ask:
+          - "If the source files change, would this prompt still make sense?" (Should be YES)
+          - "Does this tell the agent WHAT to find or HOW to synthesize?" (Should be HOW)
+          - "Could new relevant material be excluded because of this wording?" (Should be NO)
+          - "Am I prescribing content or instructing synthesis?" (Should be INSTRUCTING)
+          
+          For each section in the heading structure, generate a prompt following 
+          these principles. The prompts should guide content synthesis and discovery, 
+          not dictate specific content to include.
+          
+          Output: Prompts for each section (instruction-focused, discovery-enabling, future-proof)
         output: "section_prompts"
+        parse_json: true
         timeout: 900
         on_error: "fail"
       
@@ -660,7 +1315,7 @@ stages:
           Ensure:
           - All commit hashes are full 40-character
           - Source URLs are properly formatted GitHub blob URLs
-          - Prompts are specific and actionable
+          - Prompts are instruction-focused and discovery-enabling (not content-prescriptive)
           - Nested sections properly represented
           - All required fields present
         output: "outline_json"
@@ -676,7 +1331,7 @@ stages:
           Extract document name from: {{target_doc}}
           Convert to snake_case for filename (e.g., "design_philosophy")
           
-          Target file: {{working_dir}}/staging/outlines/{doc_name}_outline.json
+          Target file: .doc-gen/outlines/{doc_name}_outline.json
           
           Content: {{outline_json}}
           
@@ -745,22 +1400,34 @@ stages:
         agent: "foundation:zen-architect"
         mode: "ANALYZE"
         prompt: |
-          Verify all source files exist at specified commits.
+          **FINAL SANITY CHECK**: Verify all source files exist (should be ZERO missing).
           
           Outline: {{outline_path}}
           Source tree: {{source_tree_path}}
           
-          For each source file referenced:
-          1. Extract file path from GitHub URL
-          2. Check if file exists locally
-          3. Verify commit hash is valid (git cat-file -e)
+          **EXPECTED RESULT**: All files should exist because they were verified in Stage 3.
           
-          Report any missing files or invalid commits.
+          For each source file referenced in the outline and source tree:
+          1. Extract file path from GitHub URL
+          2. Use read_file to verify it exists
+          3. Verify commit hash is valid (git cat-file -e COMMIT)
+          
+          If ANY files are missing:
+          - This is a CRITICAL RECIPE BUG
+          - Stage 3 verification failed to catch these
+          - Report as ERROR, not warning
+          
+          Expected: 0 missing files
+          If found: Report as critical failure
+          
+          **SUCCESS CRITERIA**: 
+          - All files exist: ✅ Stage 3 verification worked correctly
+          - Any missing files: ❌ RECIPE BUG - Stage 3 verification incomplete
           
           Note: Files from external repos should be checked in their cache locations.
         output: "file_existence_check"
         timeout: 300
-        on_error: "continue"
+        on_error: "fail"
       
       - id: "verify-no-circular-references"
         agent: "foundation:zen-architect"
@@ -791,6 +1458,7 @@ stages:
           Section count: {{section_count}}
           File existence: {{file_existence_check}}
           Circular check: {{circular_check}}
+          Missing files report: {{missing_files_report}}
           
           Outline path: {{outline_path}}
           Source tree path: {{source_tree_path}}
@@ -802,7 +1470,7 @@ stages:
           - [ ] No circular references
           - [ ] All sources have commit hashes
           - [ ] Outline JSON is valid
-          - [ ] All source files exist
+          - [ ] **ZERO source files missing** (all pre-verified in Stage 3)
           - [ ] Section count matches document
           - [ ] Each section has sources with reasoning
           - [ ] Commits are current
@@ -814,14 +1482,25 @@ stages:
           **Statistics**:
           - Total sources: [count]
           - Excluded (circular): [count]
+          - Excluded (missing): [count from missing_files_report]
           - Total sections: [count]
           - External repos: [count]
+          
+          **File Verification Summary**:
+          - Files verified in Stage 3: [count]
+          - Files excluded (missing): [count]
+          - Files in final validation: [should be same as verified]
+          - **Missing files found in Stage 7**: [SHOULD BE ZERO - report as bug if >0]
           
           **Next Steps**:
           To regenerate the document using this outline:
           ```bash
           amplifier run "use doc-gen tool to generate document from {{outline_path}}"
           ```
+          
+          **Validation Guarantee**:
+          All source files in the outline and source tree were READ and VERIFIED
+          to exist during Stage 3. No unverified file references were included.
         output: "validation_report"
         timeout: 300
         on_error: "continue"
