@@ -119,8 +119,10 @@ stages:
         prompt: |
           Detect external repositories that might contain source material.
           
-          Check:
-          1. User-provided repos: {{external_repos}}
+          Check: 
+          - User-provided repos: {{external_repos}}
+            - NOTE: You should always pull the latest version of this repo. If url not specified from user, look for it on www.github.com/Microsoft/<repo_name>
+          
           
           For each detected external repo:
           - Get the full path
@@ -1028,8 +1030,8 @@ stages:
           Map each section to its source files.
           
           Heading structure: {{heading_structure}}
-          Source analysis: {{source_analysis}}
-          Validated sources: {{validated_source_list}}
+          Confirmed sources with evidence: {{pass2_confirmed_sources}}
+          Final source list: {{initial_source_list}}
           
           For each section:
           1. Identify which source files contain relevant content
