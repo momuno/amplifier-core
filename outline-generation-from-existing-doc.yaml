@@ -7,8 +7,9 @@ tags: ["documentation", "outline-generation", "source-analysis", "dag-validation
 # This enables human-in-loop review at critical decision points
 
 context:
-  # Required: Path to document to generate outline for
+  # Required: Path to document to generate outline for (accepts either document_path or target_doc)
   target_doc: ""  # e.g., "docs/DESIGN_PHILOSOPHY.md"
+  document_path: ""  # Alias for target_doc
   
   # Optional: Array of external repos to check (auto-detect if not provided)
   external_repos: []  # e.g., ["amplifier-foundation"]
@@ -22,10 +23,80 @@ recursion:
   max_total_steps: 100
 
 # ==============================================================================
-# STAGE 1: DOCUMENT ANALYSIS
-# Purpose: Extract essence, purpose, and scope of target document
+# STAGE 0: CONTEXT VALIDATION
+# Purpose: Validate inputs and normalize context variables
 # ==============================================================================
 stages:
+  - name: "context-validation"
+    description: "Validate and normalize context inputs before proceeding"
+    
+    steps:
+      - id: "normalize-document-path"
+        agent: "foundation:zen-architect"
+        mode: "ANALYZE"
+        prompt: |
+          **CRITICAL VALIDATION STEP**: Normalize and validate document path.
+          
+          Context received:
+          - target_doc: "{{target_doc}}"
+          - document_path: "{{document_path}}"
+          
+          **IMPORTANT**: At least one of these must be provided.
+          
+          **Task**:
+          1. Determine which variable was provided (document_path or target_doc)
+          2. Extract the actual document path (prefer document_path if both provided)
+          3. Validate the path is not empty
+          4. Extract the document name from the path (e.g., "MODULE_SOURCE_PROTOCOL" from "docs/MODULE_SOURCE_PROTOCOL.md")
+          5. Create normalized output with BOTH target_doc and document_name
+          
+          **Output format**:
+          ```json
+          {
+            "target_doc": "actual/path/to/document.md",
+            "document_name": "DOCUMENT_NAME",
+            "input_source": "document_path" or "target_doc"
+          }
+          ```
+          
+          **Error conditions**:
+          - If BOTH are empty: FAIL with error "No document path provided. Use document_path or target_doc."
+          - If path doesn't end in .md: FAIL with error "Document path must be a .md file"
+          
+          This normalized path will be used throughout the recipe.
+        output: "normalized_context"
+        parse_json: true
+        timeout: 60
+        on_error: "fail"
+      
+      - id: "verify-working-on-correct-document"
+        agent: "foundation:zen-architect"
+        mode: "ANALYZE"
+        prompt: |
+          **DOCUMENT NAME VALIDATION**: Verify we're working on the correct document.
+          
+          Normalized context: {{normalized_context}}
+          
+          **Task**:
+          1. Read the document at the normalized path
+          2. Extract the document name from the path
+          3. Verify the document exists
+          4. Display clearly: "Working on document: [DOCUMENT_NAME] at path: [PATH]"
+          
+          **This step ensures**:
+          - We know exactly what document we're generating an outline for
+          - The document exists and is readable
+          - There's no silent fallback to a different document
+          
+          If the document doesn't exist, FAIL with a clear error message.
+        output: "document_verification"
+        timeout: 120
+        on_error: "fail"
+
+  # ==============================================================================
+  # STAGE 1: DOCUMENT ANALYSIS
+  # Purpose: Extract essence, purpose, and scope of target document
+  # ==============================================================================
   - name: "document-analysis"
     description: "Analyze target document to understand its purpose and scope"
     
@@ -34,11 +105,15 @@ stages:
         agent: "foundation:zen-architect"
         mode: "ANALYZE"
         prompt: |
-          Verify that the target document exists at: {{target_doc}}
+          Verify that the target document exists at: {{normalized_context.target_doc}}
+          
+          **IMPORTANT**: We are working on document: {{normalized_context.document_name}}
           
           Use read_file to check if the file exists and is readable.
           If it doesn't exist, report an error with the exact path that was checked.
           If it exists, report success with the file size and line count.
+          
+          Verify the document name in the path matches: {{normalized_context.document_name}}
         output: "target_validation"
         timeout: 120
         on_error: "fail"
@@ -47,7 +122,9 @@ stages:
         agent: "foundation:zen-architect"
         mode: "ANALYZE"
         prompt: |
-          Read the complete target document: {{target_doc}}
+          Read the complete target document: {{normalized_context.target_doc}}
+          
+          **Working on**: {{normalized_context.document_name}}
           
           Capture the full content for analysis in subsequent steps.
         output: "target_content"
@@ -165,29 +242,77 @@ stages:
         agent: "foundation:zen-architect"
         mode: "ANALYZE"
         prompt: |
-          **GATING STEP**: Verify each file from current repository exists.
+          **CRITICAL GATING STEP**: ACTUALLY VERIFY each file exists by CALLING read_file.
           
           Files from repository scan: {{repo_file_list}}
           
-          For EACH file in the list:
-          1. Use read_file to attempt reading it
-          2. If read succeeds → File EXISTS and is readable
-          3. If read fails → File is MISSING or unreadable
+          **MANDATORY VERIFICATION PROCESS**:
           
-          Create TWO separate lists:
+          You MUST call read_file on EVERY SINGLE file in the list. DO NOT assume files exist.
+          DO NOT skip verification. DO NOT trust the file list without checking.
           
-          **VERIFIED_FILES** (exist and readable):
-          - file_path
-          - line_count (from read_file output)
-          - status: "verified"
+          For EACH file path in {{repo_file_list}}:
           
-          **MISSING_FILES** (don't exist or unreadable):
-          - file_path
-          - error: "reason for failure"
-          - status: "missing"
+          1. **CALL read_file(file_path)** - Actually invoke the tool
+          2. **Check the result**:
+             - If read_file SUCCEEDS (returns content) → Add to VERIFIED_FILES
+             - If read_file FAILS (error/exception) → Add to MISSING_FILES
+          3. **Record evidence**: Capture line_count for verified, error message for missing
           
-          **RULE**: Only files in VERIFIED_FILES can be used in subsequent passes.
-          Files in MISSING_FILES must be EXCLUDED from ALL analysis.
+          **DO NOT**:
+          - ❌ Assume files exist without calling read_file
+          - ❌ Skip files or batch-check them
+          - ❌ Trust paths without verification
+          - ❌ Include ANY file in VERIFIED_FILES that you didn't successfully read
+          
+          **YOU MUST**:
+          - ✅ Call read_file individually on each file path
+          - ✅ Verify EVERY file in the input list
+          - ✅ Track which files actually exist vs which don't
+          - ✅ Only mark as "verified" if read_file succeeded
+          
+          **Output TWO separate lists**:
+          
+          **VERIFIED_FILES** (you successfully read these with read_file):
+          ```json
+          [
+            {
+              "file_path": "path/to/file.md",
+              "line_count": <actual line count from read_file>,
+              "status": "verified",
+              "verified_at": "<timestamp>"
+            }
+          ]
+          ```
+          
+          **MISSING_FILES** (read_file failed on these):
+          ```json
+          [
+            {
+              "file_path": "path/to/missing.md",
+              "error": "<exact error message from read_file>",
+              "status": "missing",
+              "attempted_at": "<timestamp>"
+            }
+          ]
+          ```
+          
+          **CRITICAL RULE**: 
+          If a file is NOT in VERIFIED_FILES, it MUST be in MISSING_FILES.
+          Every input file must be accounted for in one list or the other.
+          
+          **VALIDATION**:
+          - len(VERIFIED_FILES) + len(MISSING_FILES) = len({{repo_file_list}})
+          - Each file appears in exactly ONE list
+          - VERIFIED_FILES only contains files you actually read successfully
+          
+          **WHY THIS MATTERS**:
+          Stage 2 generated file paths that may have errors (wrong directories, typos, etc.).
+          This step is the ONLY gate that prevents invalid paths from reaching the outline.
+          If you don't actually call read_file, invalid paths will break document generation.
+          
+          **EXPECTATION**: You will call read_file dozens or hundreds of times in this step.
+          That's correct. Don't try to optimize it away. Verify EVERY file.
         output: "current_repo_verification"
         parse_json: true
         timeout: 900
@@ -208,16 +333,23 @@ stages:
           2. If read succeeds → File EXISTS
           3. If read fails → File is MISSING
           
+          **CRITICAL: Repository Name Recording**:
+          - Record the EXACT repository name from {{external_repos_detected}}
+          - Example: If detecting files from "amplifier-foundation", record "repository: amplifier-foundation"
+          - DO NOT use generic names like "external" or "external-repo"
+          - The repository name will be used in ALL subsequent passes
+          
           Create TWO lists:
           
           **VERIFIED_EXTERNAL_FILES**:
-          - file_path
-          - repository
+          - file_path: "full/path/to/file.md"
+          - repository: "exact-repo-name"  # e.g., "amplifier-foundation"
           - status: "verified"
+          - line_count: [from read_file output]
           
           **MISSING_EXTERNAL_FILES**:
-          - file_path
-          - repository
+          - file_path: "full/path/to/file.md"
+          - repository: "exact-repo-name"
           - error: "reason"
           - status: "missing"
           
@@ -285,15 +417,21 @@ stages:
           
           1. **Read the file** using read_file
           
-          2. **Ask: "Could this file be a source for the target document?"**
+          2. **Record the repository** (CRITICAL for correct mapping):
+             - If from {{current_repo_verification}} → repository: "current"
+             - If from {{external_repo_verification}} → use the EXACT repository name
+             - Example: "amplifier-foundation" NOT "external" or "external-repo"
+             - This repository name MUST be preserved through ALL passes
           
-          3. **Analysis includes**:
+          3. **Ask: "Could this file be a source for the target document?"**
+          
+          4. **Analysis includes**:
              - **Inverse synthesis**: Would an author need this to write the target?
              - **Keyword/term detection**: Similar concepts, terminology, technical terms?
              - **Conceptual alignment**: Related ideas, foundations, specifications?
              - **Domain relevance**: Does it cover the same problem space?
           
-          4. **Reasoning**: Record WHY this file could be a source
+          5. **Reasoning**: Record WHY this file could be a source
              - What concepts/terms/ideas overlap?
              - How might it have informed the target?
              - What knowledge does it provide?
@@ -323,7 +461,7 @@ stages:
           ```yaml
           potential_sources:
             - file: "path/to/file.md"
-              repository: "current" or "external-repo-name"
+              repository: "current" or "exact-external-repo-name"  # e.g., "amplifier-foundation"
               pass1_reasoning: |
                 Why this could be a source:
                 - Conceptual overlap: [describe]
@@ -333,6 +471,12 @@ stages:
               verification_status: "verified-exists"
           ```
           
+          **CRITICAL: Repository Name Accuracy**:
+          - For current repo files: Use "current"
+          - For external repo files: Use EXACT name from {{external_repo_verification}}
+          - Example: "amplifier-foundation" NOT "external" or "external-repo-name"
+          - This repository name will flow through Pass 2 → Pass 3 → Pass 4 → Final outline
+          
           # ==============================================================================
           # STRATEGY
           # ==============================================================================
@@ -341,6 +485,7 @@ stages:
           - **Multi-read**: Read each file to understand its content
           - **Document reasoning**: Explain WHY each file is potentially relevant
           - **NO filtering yet**: Pass 2 will require strong evidence; Pass 1 is exploration
+          - **Accurate repository tracking**: Record EXACT repository name from verification steps
           
           **RULE**: Only include files from VERIFIED_FILES lists (already gated above).
         output: "pass1_potential_sources"
@@ -427,7 +572,7 @@ stages:
           ```yaml
           confirmed_sources:
             - file: "path/to/file.md"
-              repository: "current" or "external-repo-name"
+              repository: "current" or "exact-external-repo-name"  # PRESERVE from Pass 1
               confidence: "high" or "medium"
               pass2_evidence: |
                 STRONG evidence this was referenced:
@@ -439,6 +584,12 @@ stages:
               contributes_to_sections: ["Section Name 1", "Section Name 2"]
               verification_status: "verified-exists"
           ```
+          
+          **CRITICAL: Repository Name Preservation**:
+          - Copy the EXACT "repository" value from Pass 1 for each file
+          - DO NOT modify or infer repository names
+          - If Pass 1 said "amplifier-foundation", Pass 2 MUST say "amplifier-foundation"
+          - This ensures correct mapping from source → outline
           
           # ==============================================================================
           # CONFIDENCE LEVELS
@@ -485,7 +636,8 @@ stages:
           # ==============================================================================
           
           Target document path:
-          {{target_doc}}
+          {{normalized_context.target_doc}}
+          Document name: {{normalized_context.document_name}}
           
           Confirmed sources from Pass 2:
           {{pass2_confirmed_sources}}
@@ -501,8 +653,8 @@ stages:
           2. **Ask: "Does this source reference or link TO the target document?"**
           
           3. **Check for**:
-             - Markdown links: [text]({{target_doc}})
-             - Relative links: [text](path/to/{{target_doc}})
+             - Markdown links: [text]({{normalized_context.target_doc}})
+             - Relative links: [text](path/to/{{normalized_context.target_doc}})
              - Filename mentions in prose
              - @mentions or imports of target
              - Any reference indicating source depends on target
@@ -544,7 +696,7 @@ stages:
           ```yaml
           validated_sources:
             - file: "path/to/file.md"
-              repository: "repo-name"
+              repository: "repo-name"  # PRESERVE from Pass 2 EXACTLY
               confidence: "high|medium"
               evidence: "[from Pass 2]"
               contributes_to_sections: ["section1", "section2"]
@@ -552,15 +704,20 @@ stages:
               verification_status: "verified-exists"
           ```
           
+          **CRITICAL: Repository Name Preservation**:
+          - Copy the EXACT "repository" value from Pass 2 for each file
+          - DO NOT modify repository names during circular reference check
+          - Pass through: Pass 1 → Pass 2 → Pass 3 → Pass 4
+          
           **Excluded Sources** (circular references found):
           ```yaml
           circular_exclusions:
             - file: "path/to/excluded.md"
-              repository: "repo-name"
+              repository: "repo-name"  # PRESERVE from Pass 2
               reason: "References target document - higher in abstraction tree"
               evidence: |
                 Found reference to target:
-                - Link: [text]({{target_doc}})
+                - Link: [text]({{normalized_context.target_doc}})
                 - Line: [line number]
                 - Context: [surrounding text]
               hierarchy_level: "higher-than-target"
@@ -611,24 +768,66 @@ stages:
           {{external_repos_detected}}
           
           # ==============================================================================
+          # CRITICAL: COMMIT HASH RULES
+          # ==============================================================================
+          
+          **STRICT REQUIREMENT**: Use ONLY actual commit hashes from the input data above.
+          
+          ❌ **PROHIBITED**: DO NOT generate, fabricate, or invent commit hashes
+          ❌ **PROHIBITED**: DO NOT create fake 40-character hex strings
+          ❌ **PROHIBITED**: DO NOT guess at commit values
+          
+          ✅ **REQUIRED**: Extract commit hashes ONLY from:
+          1. Current repo files → Use EXACT value from {{current_repo_commit}}
+          2. External repo files → Extract EXACT commit from {{external_repos_detected}} for that repo
+          
+          **Validation**: Every commit hash MUST be traceable to the input data.
+          If you cannot find a commit hash for a repository, REQUEST IT - do not fabricate.
+          
+          # ==============================================================================
+          # CRITICAL: REPOSITORY MAPPING RULES
+          # ==============================================================================
+          
+          **STRICT REQUIREMENT**: Use ONLY the actual repository names from Pass 1/2/3.
+          
+          ❌ **PROHIBITED**: DO NOT guess repository names
+          ❌ **PROHIBITED**: DO NOT infer repository from file path patterns
+          ❌ **PROHIBITED**: DO NOT assume repository based on content
+          
+          ✅ **REQUIRED**: Use EXACT repository name from Pass 3 validated sources
+          - If Pass 3 says "repository: amplifier-foundation" → Use "amplifier-foundation"
+          - If Pass 3 says "repository: current" → Use "current"
+          - DO NOT change or modify repository names
+          
+          **Validation**: Every repository name MUST match Pass 3 exactly.
+          
+          # ==============================================================================
           # PROCESS
           # ==============================================================================
           
-          For EACH validated source:
+          For EACH validated source from Pass 3:
           
-          1. **Add commit hash**:
-             - Current repo files: use {{current_repo_commit}}
-             - External repo files: extract from {{external_repos_detected}}
+          1. **Preserve repository name** (DO NOT modify):
+             - Use the EXACT repository value from Pass 3
+             - Example: If Pass 3 has "repository: amplifier-foundation", use "amplifier-foundation"
           
-          2. **Structure cleanly**:
+          2. **Add commit hash** (use ACTUAL commits ONLY):
+             - If repository is "current" → Use {{current_repo_commit}} EXACTLY as provided
+             - If repository is external (e.g., "amplifier-foundation"):
+               a. Find this repository in {{external_repos_detected}}
+               b. Extract its commit hash
+               c. Use that EXACT commit hash
+             - NEVER generate or fabricate commit hashes
+          
+          3. **Structure cleanly**:
              - All required fields present
              - Consistent formatting
-             - Full 40-character commit hashes
+             - Full 40-character commit hashes (from input data)
           
-          3. **Verify completeness**:
-             - File path present
-             - Repository identified
-             - Commit hash added
+          4. **Verify completeness**:
+             - File path present (from Pass 3)
+             - Repository name present (from Pass 3, UNMODIFIED)
+             - Commit hash added (from input data, NEVER fabricated)
              - Evidence preserved from Pass 2
              - Confidence level from Pass 2
              - Section mappings from Pass 2
@@ -641,8 +840,8 @@ stages:
           ```yaml
           sources:
             - file: "path/to/file.md"
-              repository: "repo-name"
-              commit: "full-40-character-commit-hash"
+              repository: "repo-name"  # EXACT value from Pass 3
+              commit: "full-40-character-commit-hash"  # EXACT value from input data
               confidence: "high|medium"
               evidence: |
                 [Preserved from Pass 2]
@@ -678,20 +877,22 @@ stages:
           # ==============================================================================
           
           Before finalizing, verify:
-          - ✅ All commit hashes are full 40-character strings
+          - ✅ All commit hashes are full 40-character strings FROM INPUT DATA
+          - ✅ All commit hashes are traceable to {{current_repo_commit}} or {{external_repos_detected}}
+          - ✅ All repository names MATCH Pass 3 exactly (no modifications)
           - ✅ All files have verification_status: "verified-exists"
           - ✅ No circular references in final list
           - ✅ Evidence preserved from Pass 2 for each source
           - ✅ Section mappings present
-          - ✅ Repository correctly identified for each file
+          - ✅ NO fabricated or generated commit hashes
           
           # ==============================================================================
           # STRATEGY
           # ==============================================================================
           
           This is the CLEAN OUTPUT step:
-          - Take validated sources from Pass 3
-          - Add commit information
+          - Take validated sources from Pass 3 (preserve repository names EXACTLY)
+          - Add commit information (from input data ONLY - never fabricate)
           - Structure for downstream consumption
           - Preserve all evidence and analysis
           - Ready for Stage 4 (circular detection review) and Stage 5 (outline generation)
@@ -717,12 +918,13 @@ stages:
         prompt: |
           Find all documents that reference the target document.
           
-          Target: {{target_doc}}
+          Target: {{normalized_context.target_doc}}
+          Document name: {{normalized_context.document_name}}
           
           Search the repository for files that link to or reference this document:
           - Use grep to find mentions of the filename
           - Check README.md, index files, navigation docs
-          - Look for markdown links like [text]({{target_doc}})
+          - Look for markdown links like [text]({{normalized_context.target_doc}})
           
           Output a list of files that reference the target.
         output: "referencing_documents"
@@ -735,7 +937,8 @@ stages:
         prompt: |
           Analyze the abstraction hierarchy to determine document levels.
           
-          Target document: {{target_doc}}
+          Target document: {{normalized_context.target_doc}}
+          Document name: {{normalized_context.document_name}}
           Document analysis: {{document_analysis}}
           Documents referencing target: {{referencing_documents}}
           Initial source list: {{initial_source_list}}
@@ -783,7 +986,7 @@ stages:
           exclusions:
             - file: "path/to/file"
               reason: "References target document - higher in abstraction tree"
-              evidence: "Contains link to {{target_doc}}"
+              evidence: "Contains link to {{normalized_context.target_doc}}"
               hierarchy_level: "top-level"
           ```
           
@@ -860,7 +1063,8 @@ stages:
         prompt: |
           Extract metadata for the source tree.
           
-          Target document: {{target_doc}}
+          Target document: {{normalized_context.target_doc}}
+          Document name: {{normalized_context.document_name}}
           Document analysis: {{document_analysis}}
           Hierarchy: {{hierarchy_analysis}}
           
@@ -891,7 +1095,7 @@ stages:
           Structure:
           ```yaml
           document:
-            path: "{{target_doc}}"
+            path: "{{normalized_context.target_doc}}"
             type: "mid-level-synthesis"  # or leaf-node, top-level-overview
             purpose: "Brief description"
             scope: "What it covers"
@@ -938,8 +1142,8 @@ stages:
         prompt: |
           Write the source tree to the file system.
           
-          Extract the document name from: {{target_doc}}
-          - If path is "docs/DESIGN_PHILOSOPHY.md", name is "DESIGN_PHILOSOPHY"
+          Document name: {{normalized_context.document_name}}
+          - This was extracted in Stage 0 from the document path
           
           Target file: {{working_dir}}/source-trees/{DOC_NAME}.yaml
           
@@ -1002,22 +1206,81 @@ stages:
         prompt: |
           Extract the heading structure from the target document.
           
-          Target content: {{target_content}}
+          Target document path: {{normalized_context.target_doc}}
+          Document name: {{normalized_context.document_name}}
           
-          Use grep or text parsing to find all headings (lines starting with #).
-          Parse the hierarchy:
-          - # = level 1
-          - ## = level 2
-          - ### = level 3
-          - etc.
+          **CRITICAL: Heading Level Extraction Rules**
           
-          Create a hierarchical structure showing:
-          - Heading text
-          - Level
-          - Position in document
-          - Parent section (for nesting)
+          Use bash with grep to extract ALL headings with CORRECT levels:
           
-          Output as structured data ready for outline generation.
+          ```bash
+          grep -E "^#{1,6} " {{normalized_context.target_doc}}
+          ```
+          
+          For EACH heading line:
+          1. **Count the # characters** to determine level:
+             - `#` (1 hash) = level 1
+             - `##` (2 hashes) = level 2
+             - `###` (3 hashes) = level 3
+             - etc.
+          
+          2. **Extract heading text** (everything after the hashes and space):
+             - Remove leading `#` characters and space
+             - Preserve the actual heading text
+          
+          3. **DO NOT drop any headings**:
+             - Include the H1 title (if present)
+             - Include ALL H2, H3, H4, etc. sections
+             - Every heading in the document MUST be captured
+          
+          4. **DO NOT modify heading levels**:
+             - If document has `#` → output level 1
+             - If document has `##` → output level 2
+             - DO NOT promote H2 to H1
+             - DO NOT skip the H1 level
+          
+          **Example Extraction Logic**:
+          ```bash
+          # For each line matching "^#{1,6} ":
+          # 1. Count leading # characters
+          echo "## Core Principles" | grep -o "^#*" | wc -c
+          # Result: 2 → level = 2
+          
+          # 2. Extract text after "# "
+          echo "## Core Principles" | sed 's/^#* //'
+          # Result: "Core Principles"
+          ```
+          
+          **Validation Check**:
+          After extraction, COUNT the total headings:
+          ```bash
+          grep -cE "^#{1,6} " {{normalized_context.target_doc}}
+          ```
+          
+          Compare this count to your extracted structure.
+          - If counts match → SUCCESS ✅
+          - If counts differ → ERROR ❌ (you're missing headings)
+          
+          **Output Structure**:
+          For each heading, output:
+          ```json
+          {
+            "heading": "Exact heading text",
+            "level": 1,  // Actual level from counting #
+            "position": 1,  // Line number or sequence
+            "parent_heading": "Parent Heading"  // For nesting (optional)
+          }
+          ```
+          
+          **Quality Checks**:
+          - ✅ All headings extracted (count matches grep count)
+          - ✅ Levels are correct (based on # count)
+          - ✅ H1 heading is NOT dropped
+          - ✅ H2 headings remain level 2 (not promoted to 1)
+          - ✅ Heading text is accurate
+          
+          **Expected Result**:
+          A complete list of ALL headings with CORRECT levels, ready for outline generation.
         output: "heading_structure"
         parse_json: true
         timeout: 300
@@ -1364,7 +1627,7 @@ stages:
         agent: "foundation:zen-architect"
         mode: "ARCHITECT"
         prompt: |
-          Build the complete outline JSON.
+          Build the complete outline JSON with EXACT structure matching the example format.
           
           Schema: {{outline_schema}}
           Heading structure: {{heading_structure}}
@@ -1373,23 +1636,30 @@ stages:
           Current commit: {{current_repo_commit}}
           External repos: {{external_repos_detected}}
           Document metadata: {{document_metadata}}
+          Target document: {{normalized_context.target_doc}}
+          Document name: {{normalized_context.document_name}}
           
-          Structure:
+          # ==============================================================================
+          # CRITICAL: EXACT STRUCTURE REQUIREMENTS
+          # ==============================================================================
+          
+          **REQUIRED STRUCTURE** (must match example exactly):
+          
           ```json
           {
-            "meta": {
-              "name": "document-name",
-              "model": "claude-sonnet-4",
-              "temperature": 0.7,
-              "max_tokens": 8000,
-              "document_instruction": "Generate this document based on the source materials..."
+            "_meta": {
+              "name": "document-name-outline",
+              "document_instruction": "Generate this document based on the source materials...",
+              "model": "claude-sonnet-4-20250514",
+              "max_response_tokens": 8000,
+              "temperature": 0.2
             },
             "document": {
-              "title": "Document Title",
-              "output": "{{target_doc}}",
+              "title": "# Document Title",
+              "output": "path/to/document.md",
               "sections": [
                 {
-                  "heading": "Section Title",
+                  "heading": "# Section Title",
                   "level": 1,
                   "prompt": "Prompt for this section...",
                   "sources": [
@@ -1399,19 +1669,179 @@ stages:
                       "commit": "full-40-char-hash"
                     }
                   ],
-                  "sections": [nested subsections...]
+                  "sections": [
+                    {
+                      "heading": "## Subsection Title",
+                      "level": 2,
+                      "prompt": "Prompt for subsection...",
+                      "sources": [...],
+                      "sections": []
+                    }
+                  ]
                 }
               ]
             }
           }
           ```
           
-          Ensure:
-          - All commit hashes are full 40-character
-          - Source URLs are properly formatted GitHub blob URLs
-          - Prompts are instruction-focused and discovery-enabling (not content-prescriptive)
-          - Nested sections properly represented
-          - All required fields present
+          # ==============================================================================
+          # CRITICAL FIELD REQUIREMENTS
+          # ==============================================================================
+          
+          **Top Level**:
+          - Use `_meta` (with underscore) NOT `meta`
+          - Use `document` wrapper
+          
+          **_meta Fields** (EXACT names required):
+          - `name`: "{document-name}-outline" (e.g., "design-philosophy-outline")
+          - `document_instruction`: Overall generation guidance
+          - `model`: "claude-sonnet-4-20250514"
+          - `max_response_tokens`: 8000 (NOT "max_tokens")
+          - `temperature`: 0.2
+          
+          **document Fields**:
+          - `title`: Include markdown prefix (e.g., "# Amplifier Design Philosophy")
+          - `output`: Full path to target document (e.g., "docs/DESIGN_PHILOSOPHY.md")
+          - `sections`: Array of section objects
+          
+          **Section Fields** (EXACT names required):
+          - `heading`: Include markdown prefix based on level
+            - Level 1: "# Title"
+            - Level 2: "## Title"
+            - Level 3: "### Title"
+          - `level`: Numeric level (1, 2, 3, etc.)
+          - `prompt`: Instruction-focused prompt
+          - `sources`: Array of source objects
+          - `sections`: Array of nested subsections (NOT "children")
+          
+          **Source Fields** (EXACT names required):
+          - `file`: Full GitHub URL (NOT "url")
+          - `reasoning`: Why this source is included
+          - `commit`: Full 40-character commit hash
+          
+          **PROHIBITED FIELDS** (DO NOT include):
+          - ❌ `id` field in sections
+          - ❌ `title` field (use `heading` instead)
+          - ❌ `context` field
+          - ❌ `presentation` field
+          - ❌ `children` field (use `sections` instead)
+          - ❌ `url` field in sources (use `file` instead)
+          - ❌ `lines` field in sources
+          
+          # ==============================================================================
+          # HEADING FORMAT REQUIREMENTS
+          # ==============================================================================
+          
+          For each section, include the markdown prefix in the `heading` value:
+          
+          - Level 1: `"heading": "# Amplifier Design Philosophy"`
+          - Level 2: `"heading": "## Core Principles"`
+          - Level 3: `"heading": "### Mechanism vs Policy"`
+          
+          Extract heading text from {{heading_structure}} and prepend the appropriate number of `#` characters based on the level.
+          
+          # ==============================================================================
+          # DOCUMENT NAME EXTRACTION
+          # ==============================================================================
+          
+          Document name: {{normalized_context.document_name}}
+          - This was already extracted in Stage 0 (context-validation)
+          - Convert to lowercase with hyphens for outline name
+          - Use as: `"name": "design-philosophy-outline"`
+          
+          # ==============================================================================
+          # SOURCE URL FORMATTING
+          # ==============================================================================
+          
+          For each source, construct proper GitHub blob URL:
+          
+          **For current repository files**:
+          - Determine GitHub org and repo name
+          - Format: `https://github.com/{org}/{repo}/blob/{commit}/{file_path}`
+          - Use EXACT commit from {{current_repo_commit}}
+          
+          **For external repository files**:
+          - Extract org/repo from {{external_repos_detected}}
+          - Format: `https://github.com/{org}/{repo}/blob/{commit}/{file_path}`
+          - Use commit from external repo data
+          
+          # ==============================================================================
+          # EXAMPLE TRANSFORMATION
+          # ==============================================================================
+          
+          **WRONG** (old format):
+          ```json
+          {
+            "meta": {
+              "max_tokens": 8000
+            },
+            "sections": [
+              {
+                "id": "intro",
+                "title": "Introduction",
+                "level": 1,
+                "sources": [
+                  {
+                    "url": "path/to/file.md",
+                    "lines": "1-50"
+                  }
+                ],
+                "children": []
+              }
+            ]
+          }
+          ```
+          
+          **CORRECT** (required format):
+          ```json
+          {
+            "_meta": {
+              "name": "document-outline",
+              "max_response_tokens": 8000,
+              "document_instruction": "...",
+              "model": "claude-sonnet-4-20250514",
+              "temperature": 0.2
+            },
+            "document": {
+              "title": "# Document Title",
+              "output": "docs/DOCUMENT.md",
+              "sections": [
+                {
+                  "heading": "# Introduction",
+                  "level": 1,
+                  "prompt": "...",
+                  "sources": [
+                    {
+                      "file": "https://github.com/org/repo/blob/abc123.../path/to/file.md",
+                      "reasoning": "...",
+                      "commit": "abc123..."
+                    }
+                  ],
+                  "sections": []
+                }
+              ]
+            }
+          }
+          ```
+          
+          # ==============================================================================
+          # QUALITY CHECKS
+          # ==============================================================================
+          
+          Before finalizing, verify:
+          - ✅ Top level has `_meta` and `document` (NOT just `meta` and `sections`)
+          - ✅ `_meta` has `max_response_tokens` (NOT `max_tokens`)
+          - ✅ `_meta` has `name` field
+          - ✅ `document` has `title` with markdown prefix
+          - ✅ `document` has `output` with full path
+          - ✅ Sections use `heading` with markdown prefix (NOT `title`)
+          - ✅ Sections use `sections` for nesting (NOT `children`)
+          - ✅ Sources use `file` with full URL (NOT `url`)
+          - ✅ No `id`, `context`, `presentation`, or `lines` fields
+          - ✅ All commit hashes are full 40-character strings
+          - ✅ All headings include markdown prefix (# ## ###)
+          
+          Generate the complete outline JSON following this EXACT structure.
         output: "outline_json"
         timeout: 900
         on_error: "fail"
@@ -1422,7 +1852,7 @@ stages:
         prompt: |
           Write the outline JSON to the file system.
           
-          Extract document name from: {{target_doc}}
+          Document name: {{normalized_context.document_name}}
           Convert to snake_case for filename (e.g., "design_philosophy")
           
           Target file: .doc-gen/outlines/{doc_name}_outline.json
@@ -1469,23 +1899,104 @@ stages:
         agent: "foundation:zen-architect"
         mode: "ANALYZE"
         prompt: |
-          Count sections in the outline and verify completeness.
+          **VALIDATION CHECK 2: Section Count + Completeness Verification**
           
           Outline: {{outline_path}}
-          Original heading count: {{heading_structure}}
+          Original heading structure: {{heading_structure}}
+          Target document: {{normalized_context.target_doc}}
+          Document name: {{normalized_context.document_name}}
           
+          **Step 1: Count sections in outline**:
           Use Python to count total sections (including nested):
           ```python
           import json
           with open('{{outline_path}}') as f:
               outline = json.load(f)
-          def count(sections):
-              return len(sections) + sum(count(s.get('sections', [])) for s in sections)
-          total = count(outline['document']['sections'])
-          print(f"Total sections: {total}")
+          
+          def count_sections(sections):
+              return len(sections) + sum(count_sections(s.get('sections', [])) for s in sections)
+          
+          outline_count = count_sections(outline['document']['sections'])
+          print(f"Outline sections: {outline_count}")
           ```
           
-          Verify section count matches heading count from original document.
+          **Step 2: Count headings in original document**:
+          ```bash
+          # Count ALL headings (including H1)
+          original_count=$(grep -cE "^#{1,6} " {{normalized_context.target_doc}})
+          echo "Original headings: $original_count"
+          ```
+          
+          **Step 3: Compare counts**:
+          - If outline_count == original_count → ✅ SUCCESS
+          - If outline_count != original_count → ❌ CRITICAL ERROR: Missing sections
+          
+          **Step 4: If mismatch, identify missing sections**:
+          ```python
+          import json
+          import subprocess
+          
+          # Get all headings from original document
+          result = subprocess.run(
+              ["grep", "-E", "^#{1,6} ", "{{normalized_context.target_doc}}"],
+              capture_output=True, text=True
+          )
+          original_headings = []
+          for line in result.stdout.strip().split('\n'):
+              # Extract heading text (remove # and spaces)
+              heading = line.lstrip('#').strip()
+              original_headings.append(heading)
+          
+          # Get all headings from outline
+          with open('{{outline_path}}') as f:
+              outline = json.load(f)
+          
+          def extract_headings(sections):
+              headings = []
+              for section in sections:
+                  headings.append(section['heading'])
+                  if 'sections' in section:
+                      headings.extend(extract_headings(section['sections']))
+              return headings
+          
+          outline_headings = extract_headings(outline['document']['sections'])
+          
+          # Find missing headings
+          missing = [h for h in original_headings if h not in outline_headings]
+          extra = [h for h in outline_headings if h not in original_headings]
+          
+          if missing:
+              print(f"❌ MISSING SECTIONS ({len(missing)}):")
+              for h in missing:
+                  print(f"  - {h}")
+          
+          if extra:
+              print(f"⚠️  EXTRA SECTIONS ({len(extra)}):")
+              for h in extra:
+                  print(f"  - {h}")
+          ```
+          
+          **Output Structure**:
+          ```yaml
+          section_count_validation:
+            original_document_headings: [count from grep]
+            outline_sections: [count from outline]
+            match: true/false
+            missing_sections: [list of heading texts]
+            extra_sections: [list of heading texts]
+            status: "pass" or "fail"
+            error_message: "X sections missing from outline" or null
+          ```
+          
+          **SUCCESS CRITERIA**:
+          - ✅ Counts match exactly
+          - ✅ No missing sections
+          - ✅ No extra sections
+          
+          **FAILURE MODE**:
+          - ❌ Count mismatch → Stage 6 heading extraction bug
+          - Report exact sections that are missing
+          - Show which sections were added that shouldn't be there
         output: "section_count"
         timeout: 120
         on_error: "continue"
@@ -1494,40 +2005,177 @@ stages:
         agent: "foundation:zen-architect"
         mode: "ANALYZE"
         prompt: |
-          **FINAL SANITY CHECK**: Verify all source files exist (should be ZERO missing).
+          **VALIDATION CHECK 1: Source File Existence + Commit Validation**
           
           Outline: {{outline_path}}
           Source tree: {{source_tree_path}}
+          Current repo commit: {{current_repo_commit}}
+          External repos: {{external_repos_detected}}
           
           **EXPECTED RESULT**: All files should exist because they were verified in Stage 3.
           
-          For each source file referenced in the outline and source tree:
-          1. Extract file path from GitHub URL
-          2. Use read_file to verify it exists
-          3. Verify commit hash is valid (git cat-file -e COMMIT)
+          For EACH source file referenced in the outline and source tree:
           
-          If ANY files are missing:
-          - This is a CRITICAL RECIPE BUG
-          - Stage 3 verification failed to catch these
-          - Report as ERROR, not warning
+          **1. File Path Verification**:
+          - Extract file path from GitHub URL or source tree
+          - Extract repository name from URL or source entry
+          - Attempt to read the file using read_file
+          - If read fails → CRITICAL ERROR: File missing despite Stage 3 verification
           
-          Expected: 0 missing files
-          If found: Report as critical failure
+          **2. Commit Hash Existence Check**:
+          For each commit hash in the outline:
+          ```bash
+          # Verify commit exists in git repository
+          git cat-file -e <commit_hash> 2>/dev/null
+          # Exit code 0 = commit exists
+          # Exit code non-zero = commit doesn't exist (FABRICATED)
+          ```
+          
+          - If commit doesn't exist → CRITICAL ERROR: Fabricated commit hash
+          - Report which commits are invalid
+          - Show which repository each commit was supposed to be from
+          
+          **3. Repository Mapping Check**:
+          For each source file:
+          - Verify repository name matches actual file location
+          - Example: If source says "amplifier-foundation:docs/FILE.md"
+            → Verify FILE.md is actually in amplifier-foundation repo
+          - If mapping is wrong → CRITICAL ERROR: Wrong repository
+          
+          **Output Structure**:
+          ```yaml
+          file_validation:
+            total_files: [count]
+            verified_exist: [count]
+            missing_files: [list with paths]
+            
+          commit_validation:
+            total_commits: [count]
+            valid_commits: [count]
+            invalid_commits:
+              - commit: "hash"
+                repository: "repo-name"
+                error: "commit does not exist in repository"
+                
+          repository_validation:
+            total_sources: [count]
+            correct_mappings: [count]
+            wrong_mappings:
+              - file: "path"
+                claimed_repo: "repo-name"
+                actual_repo: "actual-repo-name"
+          ```
           
           **SUCCESS CRITERIA**: 
-          - All files exist: ✅ Stage 3 verification worked correctly
-          - Any missing files: ❌ RECIPE BUG - Stage 3 verification incomplete
+          - ✅ All files exist (0 missing)
+          - ✅ All commits are valid and exist in git (0 fabricated)
+          - ✅ All repository mappings are correct (0 wrong)
+          
+          **FAILURE MODES**:
+          - ❌ Any missing files → Stage 3 verification bug
+          - ❌ Any invalid commits → Pass 4 fabricated commit hashes
+          - ❌ Any wrong repo mappings → Pass 1/2/3 repository tracking bug
+          
+          If ANY of these checks fail, report as CRITICAL RECIPE BUG.
           
           Note: Files from external repos should be checked in their cache locations.
         output: "file_existence_check"
         timeout: 300
         on_error: "fail"
       
+      - id: "verify-heading-levels"
+        agent: "foundation:zen-architect"
+        mode: "ANALYZE"
+        prompt: |
+          **VALIDATION CHECK 3: Heading Level Accuracy**
+          
+          Outline: {{outline_path}}
+          Target document: {{normalized_context.target_doc}}
+          Document name: {{normalized_context.document_name}}
+          
+          **Purpose**: Verify that outline preserves EXACT heading levels from original document.
+          
+          **Step 1: Extract heading levels from original document**:
+          ```bash
+          # For each heading, count # characters to determine level
+          grep -E "^#{1,6} " {{normalized_context.target_doc}} | while IFS= read -r line; do
+              # Count leading # characters
+              level=$(echo "$line" | grep -o "^#*" | wc -c)
+              # Extract heading text
+              heading=$(echo "$line" | sed 's/^#* //')
+              echo "$heading|$level"
+          done
+          ```
+          
+          **Step 2: Extract heading levels from outline JSON**:
+          ```python
+          import json
+          
+          with open('{{outline_path}}') as f:
+              outline = json.load(f)
+          
+          def extract_levels(sections, results=None):
+              if results is None:
+                  results = []
+              for section in sections:
+                  results.append({
+                      'heading': section['heading'],
+                      'level': section['level']
+                  })
+                  if 'sections' in section:
+                      extract_levels(section['sections'], results)
+              return results
+          
+          outline_levels = extract_levels(outline['document']['sections'])
+          for item in outline_levels:
+              print(f"{item['heading']}|{item['level']}")
+          ```
+          
+          **Step 3: Compare levels for each heading**:
+          - Match headings by text
+          - Compare level values
+          - Report any mismatches
+          
+          **Common Issues to Check**:
+          - ❌ H1 heading dropped (document has H1, outline doesn't)
+          - ❌ H2 promoted to H1 (document has H2, outline shows level 1)
+          - ❌ Any level off by 1 (indicates systematic error)
+          
+          **Output Structure**:
+          ```yaml
+          heading_level_validation:
+            total_headings: [count]
+            correct_levels: [count]
+            incorrect_levels:
+              - heading: "Section Name"
+                expected_level: 2
+                actual_level: 1
+                error: "H2 incorrectly promoted to H1"
+            status: "pass" or "fail"
+            h1_present_in_document: true/false
+            h1_present_in_outline: true/false
+          ```
+          
+          **SUCCESS CRITERIA**:
+          - ✅ All heading levels match exactly
+          - ✅ H1 preserved if present in document
+          - ✅ No level promotions or demotions
+          
+          **FAILURE MODES**:
+          - ❌ H1 dropped → Stage 6 heading extraction bug (line 1074)
+          - ❌ H2 promoted to H1 → Stage 6 level detection bug
+          - ❌ Systematic off-by-one → Counting logic error
+          
+          If any level mismatches found, report as CRITICAL RECIPE BUG.
+        output: "heading_level_check"
+        timeout: 180
+        on_error: "fail"
+      
       - id: "verify-no-circular-references"
         agent: "foundation:zen-architect"
         mode: "ANALYZE"
         prompt: |
-          Final check for circular references.
+          **VALIDATION CHECK 4: Circular Reference Verification**
           
           Source tree: {{source_tree_yaml}}
           Exclusions: {{circular_exclusion_list}}
@@ -1546,28 +2194,99 @@ stages:
         agent: "foundation:zen-architect"
         mode: "REVIEW"
         prompt: |
-          Generate final validation report.
+          Generate comprehensive validation report covering all critical checks.
+          
+          # ==============================================================================
+          # VALIDATION RESULTS
+          # ==============================================================================
           
           JSON validation: {{json_validation}}
-          Section count: {{section_count}}
-          File existence: {{file_existence_check}}
-          Circular check: {{circular_check}}
+          Section count validation: {{section_count}}
+          File existence + commit validation: {{file_existence_check}}
+          Heading level validation: {{heading_level_check}}
+          Circular reference check: {{circular_check}}
           Missing files report: {{missing_files_report}}
           
           Outline path: {{outline_path}}
           Source tree path: {{source_tree_path}}
           
-          Provide summary:
+          # ==============================================================================
+          # VALIDATION SUMMARY
+          # ==============================================================================
           
-          ✅ **Success Criteria**:
+          Provide a comprehensive summary with clear PASS/FAIL status for each check:
+          
+          ✅ **Success Criteria** (ALL must pass):
+          
+          **1. File Existence** (Issue #1 Fix)
+          - [ ] All source files exist and are readable
+          - [ ] ZERO missing files (all pre-verified in Stage 3)
+          - Status: {{file_existence_check.file_validation.status}}
+          - Missing: {{file_existence_check.file_validation.missing_files}}
+          
+          **2. Commit Hash Validity** (Issue #1 Fix)
+          - [ ] All commit hashes exist in git repository
+          - [ ] ZERO fabricated commit hashes
+          - Status: {{file_existence_check.commit_validation.status}}
+          - Invalid commits: {{file_existence_check.commit_validation.invalid_commits}}
+          
+          **3. Repository Mapping** (Issue #2 Fix)
+          - [ ] All files mapped to correct repository
+          - [ ] ZERO wrong mappings
+          - Status: {{file_existence_check.repository_validation.status}}
+          - Wrong mappings: {{file_existence_check.repository_validation.wrong_mappings}}
+          
+          **4. Section Completeness** (Issue #3 Fix)
+          - [ ] Section count matches original document
+          - [ ] ZERO missing sections
+          - [ ] ZERO extra sections
+          - Original headings: {{section_count.section_count_validation.original_document_headings}}
+          - Outline sections: {{section_count.section_count_validation.outline_sections}}
+          - Missing: {{section_count.section_count_validation.missing_sections}}
+          - Extra: {{section_count.section_count_validation.extra_sections}}
+          
+          **5. Heading Level Accuracy** (Issue #4 Fix)
+          - [ ] All heading levels match original document
+          - [ ] H1 preserved (if present in document)
+          - [ ] No H2 promoted to H1
+          - Status: {{heading_level_check.heading_level_validation.status}}
+          - Incorrect levels: {{heading_level_check.heading_level_validation.incorrect_levels}}
+          
+          **6. Structure Validation**
           - [ ] Source tree YAML exists
-          - [ ] No circular references
-          - [ ] All sources have commit hashes
           - [ ] Outline JSON is valid
-          - [ ] **ZERO source files missing** (all pre-verified in Stage 3)
-          - [ ] Section count matches document
+          - [ ] No circular references
           - [ ] Each section has sources with reasoning
-          - [ ] Commits are current
+          
+          # ==============================================================================
+          # ISSUE-SPECIFIC VALIDATION
+          # ==============================================================================
+          
+          **Issue #1: Fabricated Commit Hashes**
+          - Total commits checked: {{file_existence_check.commit_validation.total_commits}}
+          - Valid commits: {{file_existence_check.commit_validation.valid_commits}}
+          - Invalid commits: {{file_existence_check.commit_validation.invalid_commits | length}}
+          - ✅ PASS if invalid_commits == 0, ❌ FAIL otherwise
+          
+          **Issue #2: Wrong Repository Mapping**
+          - Total sources checked: {{file_existence_check.repository_validation.total_sources}}
+          - Correct mappings: {{file_existence_check.repository_validation.correct_mappings}}
+          - Wrong mappings: {{file_existence_check.repository_validation.wrong_mappings | length}}
+          - ✅ PASS if wrong_mappings == 0, ❌ FAIL otherwise
+          
+          **Issue #3: Missing Sections**
+          - Original document sections: {{section_count.section_count_validation.original_document_headings}}
+          - Outline sections: {{section_count.section_count_validation.outline_sections}}
+          - Missing sections: {{section_count.section_count_validation.missing_sections | length}}
+          - ✅ PASS if missing_sections == 0, ❌ FAIL otherwise
+          
+          **Issue #4: Incorrect Heading Levels**
+          - Total headings checked: {{heading_level_check.heading_level_validation.total_headings}}
+          - Correct levels: {{heading_level_check.heading_level_validation.correct_levels}}
+          - Incorrect levels: {{heading_level_check.heading_level_validation.incorrect_levels | length}}
+          - H1 in document: {{heading_level_check.heading_level_validation.h1_present_in_document}}
+          - H1 in outline: {{heading_level_check.heading_level_validation.h1_present_in_outline}}
+          - ✅ PASS if incorrect_levels == 0 AND h1_preserved == true, ❌ FAIL otherwise
           
           **Artifacts Created**:
           1. Source tree: {{source_tree_path}}
