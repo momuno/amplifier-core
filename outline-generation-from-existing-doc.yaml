@@ -94,6 +94,8 @@ stages:
           - Documentation files (docs/*, context/*)
           - Specification files (specs/*)
           - README files
+          - Code files that might contain examples (src/*, lib/*, *.py, *.js, etc.)
+          - Test files that illustrate behavior (tests/*, *.py, etc.)
           - Configuration files that might contain documentation
           
           Exclude:
@@ -145,19 +147,23 @@ stages:
         on_error: "fail"
 
   # ==============================================================================
-  # STAGE 3: SOURCE DISCOVERY & VERIFICATION
-  # Purpose: Identify and VERIFY source files through evidence-based analysis
-  # Critical: Only include files that have been READ and VERIFIED to exist
+  # STAGE 3: SOURCE DISCOVERY (Multi-Pass Approach)
+  # Purpose: Identify source files through 4 focused, sequential passes
+  # Strategy: Broad → Refined → Validated → Finalized
   # ==============================================================================
   - name: "source-discovery"
-    description: "Identify and verify source files exist before including in analysis"
+    description: "Multi-pass source discovery: broad identification, refinement, circular check, finalization"
     
     steps:
-      - id: "verify-potential-sources-exist"
+      # ============================================================================
+      # UPFRONT FILE VERIFICATION (Gates all subsequent analysis)
+      # ============================================================================
+      
+      - id: "verify-current-repo-files-exist"
         agent: "foundation:zen-architect"
         mode: "ANALYZE"
         prompt: |
-          **CRITICAL VALIDATION STEP**: Verify each potential source file exists.
+          **GATING STEP**: Verify each file from current repository exists.
           
           Files from repository scan: {{repo_file_list}}
           
@@ -178,343 +184,24 @@ stages:
           - error: "reason for failure"
           - status: "missing"
           
-          **RULE**: Only files in VERIFIED_FILES can be included as sources.
-          Files in MISSING_FILES must be EXCLUDED from all analysis.
-          
-          This is a GATING step - prevents invalid file references downstream.
-        output: "file_verification_results"
+          **RULE**: Only files in VERIFIED_FILES can be used in subsequent passes.
+          Files in MISSING_FILES must be EXCLUDED from ALL analysis.
+        output: "current_repo_verification"
         parse_json: true
         timeout: 900
         on_error: "fail"
       
-      - id: "read-verified-sources"
+      - id: "verify-external-repo-files-exist"
         agent: "foundation:zen-architect"
         mode: "ANALYZE"
         prompt: |
-          Read the content of VERIFIED files only.
-          
-          Verified files: {{file_verification_results}}
-          
-          Use read_file on each file in the VERIFIED_FILES list.
-          Do NOT attempt to read files from MISSING_FILES list.
-          
-          Build a comprehensive understanding of what content exists where.
-          
-          For each verified file, capture:
-          - Full file path
-          - Content summary
-          - Key concepts/sections
-          - Document type (spec, guide, reference, etc.)
-        output: "verified_sources_content"
-        timeout: 900
-        on_error: "continue"
-      
-      - id: "report-missing-files"
-        agent: "foundation:zen-architect"
-        mode: "ANALYZE"
-        prompt: |
-          Report on missing files for user awareness.
-          
-          Verification results: {{file_verification_results}}
-          
-          Extract the MISSING_FILES list and provide a summary:
-          - How many files were missing
-          - Which files were missing
-          - Why they might be missing (recently removed, wrong path, etc.)
-          
-          This is informational only - missing files are already excluded.
-        output: "missing_files_report"
-        timeout: 180
-        on_error: "continue"
-      
-      - id: "compare-and-identify-sources"
-        agent: "foundation:zen-architect"
-        mode: "ANALYZE"
-        prompt: |
-          Compare target document to VERIFIED files only and identify sources.
-          
-          **CRITICAL**: Only analyze files from VERIFIED_FILES list.
-          Do NOT include any files from MISSING_FILES list.
-          
-          Target document analysis:
-          {{document_analysis}}
-          
-          Verified sources content:
-          {{verified_sources_content}}
-          
-          Verification results (for reference):
-          {{file_verification_results}}
-          
-          # ==============================================================================
-          # THE INVERSE SYNTHESIS PROBLEM
-          # ==============================================================================
-          
-          **Core Principle**: Think about the INVERSE of synthesis.
-          
-          When a document synthesizes content from sources, it:
-          - Combines multiple perspectives
-          - Abstracts from concrete to conceptual
-          - Unifies different terminology into consistent language
-          - Creates new explanations from existing material
-          
-          Your task is the INVERSE: Given synthesized content, identify what sources
-          were likely combined to create it.
-          
-          **DO NOT just look for keyword matches!**
-          
-          Sources may use completely different terminology but contain the conceptual
-          material that was synthesized. For example:
-          - Document says "kernel-like architecture" 
-            → Sources might discuss "modular design", "contracts", "protocols", "interfaces"
-          - Document says "regeneration-friendly"
-            → Sources might describe "idempotent", "declarative", "stateless"
-          - Document explains a synthesized principle
-            → Sources contain the raw examples, specs, and implementation details
-          
-          # ==============================================================================
-          # KEY QUESTIONS FOR SOURCE DISCOVERY (Answer these for each section)
-          # ==============================================================================
-          
-          For each section in the target document, ask:
-          
-          1. **"What is this section really about?"** (conceptual level, not just keywords)
-             - What core concepts are being explained?
-             - What mental model is being constructed?
-             - What understanding is being built?
-          
-          2. **"What source materials would an author need to synthesize this content?"**
-             - What foundational knowledge is required?
-             - What examples or concrete instances inform this?
-             - What specifications or contracts are referenced?
-             - What philosophical/design principles underlie this?
-          
-          3. **"What different perspectives/sources might contribute to this synthesis?"**
-             - Philosophy/rationale documents (the "WHY")
-             - Specifications/contracts (the "WHAT")
-             - Implementation examples (the "HOW")
-             - Process/workflow documentation (the "WHEN/WHERE")
-             - Reference documentation (the "DETAILS")
-          
-          4. **"Are there examples, specs, or implementation docs that inform this?"**
-             - Code examples that demonstrate concepts
-             - Specifications that define behaviors
-             - Implementation files that show patterns
-             - Test files that clarify expectations
-          
-          # ==============================================================================
-          # INVERSE SYNTHESIS EXAMPLES
-          # ==============================================================================
-          
-          **Example 1: Architectural Philosophy Section**
-          
-          Target document content:
-          "Amplifier's modular design enables rapid regeneration by treating each 
-          module as an independent unit with stable interfaces."
-          
-          WRONG approach (lexical matching):
-          → Search for files containing "modular design", "regeneration", "interfaces"
-          
-          RIGHT approach (inverse synthesis):
-          → Ask: "What sources would I need to write this statement?"
-          → Identify conceptual materials:
-             - MODULAR_DESIGN_PHILOSOPHY.md (explains the "why" of modularity)
-             - module_protocol.py (defines the "what" - actual interfaces/contracts)
-             - example_modules/ (shows the "how" - concrete implementations)
-             - REGENERATION_GUIDE.md (explains the regeneration process)
-             - interface_contracts.md (specifies stability guarantees)
-          
-          These sources might use terms like "bricks", "contracts", "protocols", "composable",
-          "idempotent" instead of the exact words in the target document, but they contain
-          the raw material that was synthesized into the statement.
-          
-          **Example 2: Technical Concept Explanation**
-          
-          Target document content:
-          "The discovery protocol validates sources through pattern matching and 
-          file existence checks."
-          
-          WRONG approach:
-          → Look for files mentioning "discovery protocol", "pattern matching"
-          
-          RIGHT approach:
-          → Ask: "What implementation details inform this explanation?"
-          → Identify sources:
-             - discovery.py (implementation of the discovery mechanism)
-             - validation.py (implementation of validation checks)
-             - SOURCE_PATTERNS configuration (the actual patterns)
-             - tests/test_discovery.py (shows validation behavior)
-             - error_handling.md (explains validation failures)
-          
-          The implementation might use function names like `find_modules()` or 
-          `check_source_validity()` instead of "discovery protocol", but these
-          are the sources that enable explaining the protocol.
-          
-          # ==============================================================================
-          # MULTI-PERSPECTIVE SOURCE ANALYSIS
-          # ==============================================================================
-          
-          For EACH section in the target document, identify sources across these types:
-          
-          **1. PHILOSOPHY / RATIONALE (The "WHY")**
-          - Design philosophy documents
-          - Architecture decision records
-          - Principle explanations
-          - Motivation documents
-          - Vision/mission statements
-          
-          **2. SPECIFICATIONS / CONTRACTS (The "WHAT")**
-          - Protocol definitions
-          - Interface specifications
-          - API contracts
-          - Data structure specs
-          - Behavior definitions
-          
-          **3. IMPLEMENTATION / EXAMPLES (The "HOW")**
-          - Source code files
-          - Example implementations
-          - Reference implementations
-          - Code patterns
-          - Utility functions
-          
-          **4. PROCESS / WORKFLOWS (The "WHEN/WHERE")**
-          - Process documentation
-          - Workflow descriptions
-          - Usage guides
-          - Integration guides
-          - Best practices
-          
-          **5. REFERENCE / DETAILS (The "DETAILS")**
-          - Technical reference docs
-          - API documentation
-          - Configuration options
-          - Error catalogs
-          - Troubleshooting guides
-          
-          **6. TESTS / VALIDATION (The "PROOF")**
-          - Test files that demonstrate behavior
-          - Test cases that show expectations
-          - Validation examples
-          - Contract tests
-          
-          # ==============================================================================
-          # DISCOVERY METHODOLOGY
-          # ==============================================================================
-          
-          For each VERIFIED file, perform this analysis:
-          
-          **Step 1: Conceptual Analysis**
-          - What concepts does this file contain?
-          - What knowledge does it convey?
-          - What perspective does it provide? (why/what/how/when/details)
-          
-          **Step 2: Synthesis Mapping**
-          - Which sections of the target document could be synthesized from this?
-          - What explanations in the target draw from this file's content?
-          - Could an author have used this file as source material?
-          
-          **Step 3: Evidence Collection**
-          - Verbatim matches (direct text reuse)
-          - Conceptual alignment (same ideas, different words)
-          - Structural similarity (same organization pattern)
-          - Examples referenced (specific instances cited)
-          - Implementations demonstrated (code patterns shown)
-          - Terminology variants (different words, same meaning)
-          
-          **Step 4: Confidence Assessment**
-          Consider:
-          - How central is this file's content to the target section?
-          - Could the section be written without this file?
-          - Does this file provide unique information?
-          - Are there clear conceptual connections?
-          
-          # ==============================================================================
-          # TERMINOLOGY VARIATION AWARENESS
-          # ==============================================================================
-          
-          **CRITICAL**: Sources may use DIFFERENT terminology for the SAME concepts.
-          
-          Common variations to watch for:
-          - "modules" ↔ "bricks" ↔ "components" ↔ "units"
-          - "interfaces" ↔ "contracts" ↔ "protocols" ↔ "APIs"
-          - "discovery" ↔ "detection" ↔ "finding" ↔ "locating"
-          - "validation" ↔ "verification" ↔ "checking" ↔ "ensuring"
-          - "regeneration" ↔ "rebuilding" ↔ "recreation" ↔ "reconstruction"
-          
-          Look for conceptual matches, not just lexical matches.
-          
-          # ==============================================================================
-          # SOURCE CATEGORIZATION
-          # ==============================================================================
-          
-          Categorize sources by confidence AND by type:
-          
-          **Confidence Levels**:
-          - **Very High**: Verbatim text matches + Strong conceptual alignment
-          - **High**: Clear conceptual alignment + Supporting evidence
-          - **Medium**: Related concepts that likely informed the synthesis
-          - **Should Include**: Conceptually relevant but indirect contribution
-          
-          **Evidence Types** (can have multiple):
-          - verbatim_match: Direct text reuse
-          - conceptual_alignment: Same ideas, different expression
-          - structural_parallel: Similar organization
-          - example_source: Concrete instances cited
-          - implementation_basis: Code patterns demonstrated
-          - philosophical_foundation: Underlying principles explained
-          - specification_basis: Contracts/protocols defined
-          
-          # ==============================================================================
-          # OUTPUT FORMAT
-          # ==============================================================================
-          
-          For each identified source, document:
-          
-          ```yaml
-          - file: "path/to/source.md"
-            verification_status: "verified-exists"
-            confidence: "very-high|high|medium|should-include"
-            source_type: "philosophy|specification|implementation|process|reference|test"
-            evidence_types: ["verbatim_match", "conceptual_alignment", ...]
-            contributes_to_sections: ["Section Name 1", "Section Name 2"]
-            synthesis_reasoning: |
-              Explain the INVERSE SYNTHESIS reasoning:
-              - What concepts from this source appear in the target?
-              - How was this source's content likely synthesized?
-              - What terminology variations exist between source and target?
-              - Why would an author need this source to write the target?
-          ```
-          
-          **OUTPUT CONSTRAINT**: Only include files that were successfully verified.
-          If a file appears relevant but is in MISSING_FILES, note it separately
-          as "suggested-but-missing" for user awareness.
-          
-          # ==============================================================================
-          # QUALITY CHECK
-          # ==============================================================================
-          
-          Before finalizing, verify:
-          - [ ] Have I considered ALL types of sources (philosophy, specs, impl, process, etc.)?
-          - [ ] Have I looked beyond keyword matches to conceptual connections?
-          - [ ] Have I identified sources that use different terminology?
-          - [ ] Have I asked "what would an author need to write this?" for each section?
-          - [ ] Have I mapped both direct and synthesized content?
-          - [ ] Am I capturing the full breadth of source material used?
-        output: "source_analysis"
-        parse_json: true
-        timeout: 1200
-        on_error: "fail"
-      
-      - id: "verify-external-sources-exist"
-        agent: "foundation:zen-architect"
-        mode: "ANALYZE"
-        prompt: |
-          **CRITICAL VALIDATION**: Verify external repository files exist.
+          **GATING STEP**: Verify external repository files exist.
           
           External repos detected: {{external_repos_detected}}
           
           If no external repos were detected, output empty lists and continue.
           
-          For each external repo file:
+          For EACH external repo file:
           1. Use read_file to verify it exists
           2. If read succeeds → File EXISTS
           3. If read fails → File is MISSING
@@ -532,77 +219,482 @@ stages:
           - error: "reason"
           - status: "missing"
           
-          Only verified external files can be included as sources.
-        output: "external_file_verification"
+          Only verified external files can be used in subsequent passes.
+        output: "external_repo_verification"
         parse_json: true
         timeout: 600
         on_error: "continue"
       
-      - id: "read-verified-external-sources"
+      - id: "report-missing-files"
         agent: "foundation:zen-architect"
         mode: "ANALYZE"
         prompt: |
-          Read VERIFIED external repository files only.
+          Report on ALL missing files for user awareness.
           
-          External verification: {{external_file_verification}}
-          Target document analysis: {{document_analysis}}
+          Current repo verification: {{current_repo_verification}}
+          External repo verification: {{external_repo_verification}}
           
-          For each file in VERIFIED_EXTERNAL_FILES:
-          1. Read the content
-          2. Compare to target document
-          3. Identify philosophical/foundational content that appears in target
+          Combine MISSING_FILES from both verifications and provide summary:
+          - Total missing files count
+          - Missing files by repository
+          - Possible reasons (deleted, moved, wrong path, etc.)
           
-          Cross-repository synthesis is common for explanatory documents.
-          Look for foundation concepts, design patterns, architectural principles.
-          
-          **OUTPUT**: Only include files that were successfully verified.
-          Do NOT include files from MISSING_EXTERNAL_FILES list.
-          
-          If no external repos or all missing, output empty analysis.
-        output: "external_source_analysis"
-        timeout: 900
+          This is informational only - missing files are already excluded.
+        output: "missing_files_report"
+        timeout: 180
         on_error: "continue"
       
-      - id: "create-initial-source-list"
+      # ============================================================================
+      # PASS 1: Broad Potential Source Identification
+      # Input: Target document + ALL verified files
+      # Process: For EACH file, read and ask "Could this be a source?"
+      # Output: Broad POTENTIAL sources list (be INCLUSIVE)
+      # ============================================================================
+      
+      - id: "pass1-identify-potential-sources"
+        agent: "foundation:zen-architect"
+        mode: "ANALYZE"
+        prompt: |
+          **PASS 1: Broad Potential Source Identification**
+          
+          Goal: Be INCLUSIVE - capture all files that COULD be sources for the target document.
+          
+          # ==============================================================================
+          # INPUT DATA
+          # ==============================================================================
+          
+          Target document essence:
+          {{document_analysis}}
+          
+          Target document content:
+          {{target_content}}
+          
+          Verified current repo files:
+          {{current_repo_verification}}
+          
+          Verified external repo files:
+          {{external_repo_verification}}
+          
+          # ==============================================================================
+          # PROCESS
+          # ==============================================================================
+          
+          For EACH verified file (current repo + external repo):
+          
+          1. **Read the file** using read_file
+          
+          2. **Ask: "Could this file be a source for the target document?"**
+          
+          3. **Analysis includes**:
+             - **Inverse synthesis**: Would an author need this to write the target?
+             - **Keyword/term detection**: Similar concepts, terminology, technical terms?
+             - **Conceptual alignment**: Related ideas, foundations, specifications?
+             - **Domain relevance**: Does it cover the same problem space?
+          
+          4. **Reasoning**: Record WHY this file could be a source
+             - What concepts/terms/ideas overlap?
+             - How might it have informed the target?
+             - What knowledge does it provide?
+          
+          # ==============================================================================
+          # INCLUSION CRITERIA (Be Generous)
+          # ==============================================================================
+          
+          Include a file as POTENTIAL if ANY of these are true:
+          - ✅ Contains related technical concepts or terminology
+          - ✅ Defines foundations that target builds on
+          - ✅ Covers same problem domain or architecture
+          - ✅ Contains examples, specs, or patterns target might reference
+          - ✅ Provides background knowledge target assumes
+          - ✅ Even weak conceptual overlap (we'll refine in Pass 2)
+          
+          Exclude only if:
+          - ❌ Completely unrelated domain (e.g., testing code when target is about philosophy)
+          - ❌ No shared concepts or terminology whatsoever
+          - ❌ Different technology stack with no conceptual overlap
+          
+          # ==============================================================================
+          # OUTPUT FORMAT
+          # ==============================================================================
+          
+          For EACH potential source:
+          ```yaml
+          potential_sources:
+            - file: "path/to/file.md"
+              repository: "current" or "external-repo-name"
+              pass1_reasoning: |
+                Why this could be a source:
+                - Conceptual overlap: [describe]
+                - Keywords/terms: [list matching terms]
+                - Domain relevance: [explain]
+                - Inverse synthesis: [what target might have drawn from this]
+              verification_status: "verified-exists"
+          ```
+          
+          # ==============================================================================
+          # STRATEGY
+          # ==============================================================================
+          
+          - **Err on side of INCLUSION**: It's better to capture too many in Pass 1
+          - **Multi-read**: Read each file to understand its content
+          - **Document reasoning**: Explain WHY each file is potentially relevant
+          - **NO filtering yet**: Pass 2 will require strong evidence; Pass 1 is exploration
+          
+          **RULE**: Only include files from VERIFIED_FILES lists (already gated above).
+        output: "pass1_potential_sources"
+        parse_json: true
+        timeout: 1800
+        on_error: "fail"
+      
+      # ============================================================================
+      # PASS 2: Confirmed Source Refinement
+      # Input: Full target + ALL potential sources from Pass 1
+      # Process: Re-read everything, require STRONG evidence
+      # Output: Refined CONFIRMED sources list (be SELECTIVE)
+      # ============================================================================
+      
+      - id: "pass2-refine-to-confirmed-sources"
+        agent: "foundation:zen-architect"
+        mode: "ANALYZE"
+        prompt: |
+          **PASS 2: Confirmed Source Refinement**
+          
+          Goal: Be SELECTIVE - narrow to sources that were MOST LIKELY referenced.
+          
+          # ==============================================================================
+          # INPUT DATA (Fresh Re-Read)
+          # ==============================================================================
+          
+          Target document (RE-READ COMPLETELY):
+          {{target_content}}
+          
+          Target document analysis:
+          {{document_analysis}}
+          
+          Potential sources from Pass 1:
+          {{pass1_potential_sources}}
+          
+          # ==============================================================================
+          # PROCESS
+          # ==============================================================================
+          
+          With BOTH target and potential sources fresh in context:
+          
+          1. **Re-read each potential source file** (get full content back in context)
+          
+          2. **Ask: "Was this source MOST LIKELY referenced to create the target?"**
+          
+          3. **Evidence Required** (at least ONE must be TRUE):
+             - **Direct text matches or paraphrasing**: Quote from target matches/paraphrases source
+             - **Conceptual content in target**: Target explains concepts defined in source
+             - **Specifications cited**: Target uses specs/standards from source
+             - **Foundation knowledge**: Target assumes knowledge provided by source
+             - **Examples referenced**: Target cites or builds on source examples
+          
+          4. **Record specific evidence**:
+             - Quote exact text from TARGET: "[quote]"
+             - Quote matching text from SOURCE: "[quote]"
+             - OR Concept match: "Target explains X (quote), source defines X (quote)"
+          
+          # ==============================================================================
+          # REFINEMENT CRITERIA (Be Strict)
+          # ==============================================================================
+          
+          Promote to CONFIRMED if evidence shows:
+          - ✅ **Direct content match**: Text in target clearly derives from source
+          - ✅ **Concept explanation**: Target explains concepts this source defines
+          - ✅ **Specification usage**: Target uses specs/APIs/standards from source
+          - ✅ **Foundation dependency**: Target's arguments require this source's concepts
+          - ✅ **Example reference**: Target's examples come from or build on this source
+          
+          Keep as potential-only (don't confirm) if:
+          - ⚠️ Only weak conceptual overlap
+          - ⚠️ Shared terminology but no content derivation
+          - ⚠️ Related domain but no clear influence
+          
+          Exclude entirely if:
+          - ❌ No evidence of actual usage in target
+          - ❌ Only abstract "could be related" reasoning
+          - ❌ Conceptual mismatch revealed by deeper reading
+          
+          # ==============================================================================
+          # OUTPUT FORMAT
+          # ==============================================================================
+          
+          For EACH confirmed source:
+          ```yaml
+          confirmed_sources:
+            - file: "path/to/file.md"
+              repository: "current" or "external-repo-name"
+              confidence: "high" or "medium"
+              pass2_evidence: |
+                STRONG evidence this was referenced:
+                - Target quote: "[exact text from target]"
+                - Source quote: "[matching text from source]"
+                - Concept match: "[specific concept in both with quotes]"
+                - Specification: "[spec used in target, defined in source]"
+                - Foundation: "[knowledge target assumes, source provides]"
+              contributes_to_sections: ["Section Name 1", "Section Name 2"]
+              verification_status: "verified-exists"
+          ```
+          
+          # ==============================================================================
+          # CONFIDENCE LEVELS
+          # ==============================================================================
+          
+          - **High**: Multiple direct text matches OR strong concept alignment with quotes
+          - **Medium**: Clear conceptual content match with specific supporting evidence
+          
+          (Low confidence should be EXCLUDED - don't include in confirmed list)
+          
+          # ==============================================================================
+          # STRATEGY
+          # ==============================================================================
+          
+          - **Multi-read**: Re-read BOTH target and sources to have fresh context
+          - **Evidence-based**: Every source needs specific quotes or concrete matches
+          - **Selective filtering**: Many potential sources won't have strong evidence
+          - **Quote precisely**: Provide actual text from both target and source
+          
+          **Expected**: Confirmed list should be SMALLER than potential list.
+          Only sources with strong evidence should make it through Pass 2.
+        output: "pass2_confirmed_sources"
+        parse_json: true
+        timeout: 1800
+        on_error: "fail"
+      
+      # ============================================================================
+      # PASS 3: Cyclical Dependency Check
+      # Input: Confirmed sources + target document path
+      # Process: Check if any source references/links TO the target
+      # Output: Validated sources with circular references REMOVED
+      # ============================================================================
+      
+      - id: "pass3-check-circular-references"
+        agent: "foundation:zen-architect"
+        mode: "ANALYZE"
+        prompt: |
+          **PASS 3: Cyclical Dependency Check**
+          
+          Goal: Be PROTECTIVE - eliminate circular dependencies to maintain DAG structure.
+          
+          # ==============================================================================
+          # INPUT DATA
+          # ==============================================================================
+          
+          Target document path:
+          {{target_doc}}
+          
+          Confirmed sources from Pass 2:
+          {{pass2_confirmed_sources}}
+          
+          # ==============================================================================
+          # PROCESS
+          # ==============================================================================
+          
+          For EACH confirmed source:
+          
+          1. **Re-read the source file** to check for references to target
+          
+          2. **Ask: "Does this source reference or link TO the target document?"**
+          
+          3. **Check for**:
+             - Markdown links: [text]({{target_doc}})
+             - Relative links: [text](path/to/{{target_doc}})
+             - Filename mentions in prose
+             - @mentions or imports of target
+             - Any reference indicating source depends on target
+          
+          4. **Apply circular reference rule**:
+             - If source links TO target → source is HIGHER in abstraction tree
+             - Higher-level docs abstract/summarize LOWER-level docs
+             - Using higher-level doc as source for lower-level = CIRCULAR
+             - **EXCLUDE** to prevent cycle
+          
+          # ==============================================================================
+          # CIRCULAR REFERENCE RULES
+          # ==============================================================================
+          
+          **Direction matters**:
+          - ✅ Target references source → OK (info flows UP)
+          - ❌ Source references target → CIRCULAR (would create cycle)
+          
+          **Example**:
+          - README.md links to DESIGN_PHILOSOPHY.md
+          - README is HIGHER (abstracts/summarizes)
+          - README CANNOT be source for DESIGN_PHILOSOPHY
+          - That would be circular: DESIGN_PHILOSOPHY would depend on its own summary
+          
+          **Abstraction hierarchy**:
+          ```
+          Top-level (README, overview)
+              ↓ references/abstracts
+          Mid-level (explanatory docs, synthesis)
+              ↓ references/derives
+          Leaf-level (specs, code, foundational docs)
+          ```
+          
+          # ==============================================================================
+          # OUTPUT FORMAT
+          # ==============================================================================
+          
+          **Validated Sources** (no circular references):
+          ```yaml
+          validated_sources:
+            - file: "path/to/file.md"
+              repository: "repo-name"
+              confidence: "high|medium"
+              evidence: "[from Pass 2]"
+              contributes_to_sections: ["section1", "section2"]
+              circular_check: "no-reference-to-target"
+              verification_status: "verified-exists"
+          ```
+          
+          **Excluded Sources** (circular references found):
+          ```yaml
+          circular_exclusions:
+            - file: "path/to/excluded.md"
+              repository: "repo-name"
+              reason: "References target document - higher in abstraction tree"
+              evidence: |
+                Found reference to target:
+                - Link: [text]({{target_doc}})
+                - Line: [line number]
+                - Context: [surrounding text]
+              hierarchy_level: "higher-than-target"
+          ```
+          
+          # ==============================================================================
+          # STRATEGY
+          # ==============================================================================
+          
+          - **Grep for links**: Use grep to find markdown link patterns efficiently
+          - **Read to verify**: Read files to understand context of references
+          - **Document exclusions**: Provide clear evidence for each excluded source
+          - **Preserve structure**: Keep documentation for approval/review stage
+          
+          **Expected**: Most sources should pass (no circular refs), but some may be excluded.
+          Any file that links TO the target must be excluded.
+        output: "pass3_validated_sources"
+        parse_json: true
+        timeout: 900
+        on_error: "fail"
+      
+      # ============================================================================
+      # PASS 4: Finalized Source List
+      # Input: Validated sources + commit hashes for all repos
+      # Process: Add commit info, structure cleanly
+      # Output: Clean source list ready for outline generation
+      # ============================================================================
+      
+      - id: "pass4-finalize-source-list"
         agent: "foundation:zen-architect"
         mode: "ARCHITECT"
         prompt: |
-          Create the initial comprehensive source list from VERIFIED files only.
+          **PASS 4: Finalized Source List**
           
-          **CRITICAL VALIDATION**: Only include files that were verified to exist.
+          Goal: Create CLEAN, structured source list ready for outline generation.
           
-          Input data:
-          - Current repository sources: {{source_analysis}}
-          - External repository sources: {{external_source_analysis}}
-          - File verification results: {{file_verification_results}}
-          - External verification results: {{external_file_verification}}
+          # ==============================================================================
+          # INPUT DATA
+          # ==============================================================================
           
-          **RULE**: Every file in the source list MUST have been verified to exist.
-          Cross-reference each file against the VERIFIED_FILES lists.
+          Validated sources from Pass 3:
+          {{pass3_validated_sources}}
           
-          For each source:
+          Current repository commit:
+          {{current_repo_commit}}
+          
+          External repositories:
+          {{external_repos_detected}}
+          
+          # ==============================================================================
+          # PROCESS
+          # ==============================================================================
+          
+          For EACH validated source:
+          
+          1. **Add commit hash**:
+             - Current repo files: use {{current_repo_commit}}
+             - External repo files: extract from {{external_repos_detected}}
+          
+          2. **Structure cleanly**:
+             - All required fields present
+             - Consistent formatting
+             - Full 40-character commit hashes
+          
+          3. **Verify completeness**:
+             - File path present
+             - Repository identified
+             - Commit hash added
+             - Evidence preserved from Pass 2
+             - Confidence level from Pass 2
+             - Section mappings from Pass 2
+          
+          # ==============================================================================
+          # OUTPUT FORMAT
+          # ==============================================================================
+          
+          **Final Source List** (ready for outline generation):
           ```yaml
-          - file: "path/to/file"
-            repository: "repo-name"
-            commit: "commit-hash"
-            confidence: "very-high|high|medium"
-            evidence: "Description of matching content"
-            supports_sections: ["section1", "section2"]
-            verification_status: "verified-exists"
+          sources:
+            - file: "path/to/file.md"
+              repository: "repo-name"
+              commit: "full-40-character-commit-hash"
+              confidence: "high|medium"
+              evidence: |
+                [Preserved from Pass 2]
+                Strong evidence this was referenced:
+                - Target quote: "[...]"
+                - Source quote: "[...]"
+              supports_sections: ["Section 1", "Section 2"]
+              verification_status: "verified-exists"
+              circular_check: "passed"
           ```
           
-          If the source analysis included any files that are NOT in the verified lists,
-          create a separate section:
+          **Circular Exclusions** (for review):
           ```yaml
-          suggested_but_missing:
-            - file: "path/to/missing/file"
-              reason: "File was suggested but doesn't exist"
-              note: "Referenced in target doc but file is missing"
+          circular_exclusions:
+            - file: "path/to/excluded.md"
+              reason: "References target - higher in abstraction tree"
+              evidence: "[from Pass 3]"
           ```
           
-          Output as structured YAML.
+          **Statistics**:
+          ```yaml
+          statistics:
+            total_files_scanned: [count from Pass 1]
+            potential_sources_identified: [count from Pass 1]
+            confirmed_sources: [count from Pass 2]
+            circular_exclusions: [count from Pass 3]
+            final_sources: [count after Pass 3]
+            verification_status: "all-sources-verified-exist"
+          ```
           
-          **GUARANTEE**: All files in the main source list have been read and verified.
+          # ==============================================================================
+          # QUALITY CHECKS
+          # ==============================================================================
+          
+          Before finalizing, verify:
+          - ✅ All commit hashes are full 40-character strings
+          - ✅ All files have verification_status: "verified-exists"
+          - ✅ No circular references in final list
+          - ✅ Evidence preserved from Pass 2 for each source
+          - ✅ Section mappings present
+          - ✅ Repository correctly identified for each file
+          
+          # ==============================================================================
+          # STRATEGY
+          # ==============================================================================
+          
+          This is the CLEAN OUTPUT step:
+          - Take validated sources from Pass 3
+          - Add commit information
+          - Structure for downstream consumption
+          - Preserve all evidence and analysis
+          - Ready for Stage 4 (circular detection review) and Stage 5 (outline generation)
+          
+          **Output name**: "initial_source_list" (matches what later stages expect)
         output: "initial_source_list"
         parse_json: true
         timeout: 600
