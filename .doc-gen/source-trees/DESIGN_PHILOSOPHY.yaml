@@ -1,0 +1,310 @@
+# Source Tree for docs/DESIGN_PHILOSOPHY.md
+# This file documents the authoritative sources used to generate/regenerate this document
+# and tracks the dependency relationships to prevent circular references.
+
+document:
+  path: "docs/DESIGN_PHILOSOPHY.md"
+  type: "mid-level-synthesis"
+  purpose: "Complete design philosophy for Amplifier - principles, patterns, and decision frameworks that guide all development using Linux kernel as metaphor"
+  scope:
+    - "6 core principles (Mechanism Not Policy, Ruthless Simplicity, Small Stable Boring Kernel, Modular Design, Event-First Observability, Text-First Inspectable)"
+    - "Linux kernel decision framework with metaphor mapping and decision playbook"
+    - "Kernel vs module architectural boundaries (mechanisms vs policies)"
+    - "Module design philosophy: Bricks & Studs (LEGO-inspired regeneration)"
+    - "Implementation patterns (vertical slices, testing, error handling, simplicity guidelines)"
+    - "Decision frameworks (5 questions, library vs custom code)"
+    - "Anti-patterns to resist (kernel, module, design, process)"
+    - "Governance and evolution (kernel high bar/low velocity, modules fast iteration)"
+    - "Quick reference checklists for kernel work, module work, and design decisions"
+  
+  referenced_by:
+    - file: "README.md"
+      type: "navigation"
+      context: "Links to target as 'Kernel principles and patterns' (line 187)"
+    
+    - file: "bundle.md"
+      type: "bundle_descriptor"
+      context: "Describes target as 'Why the kernel is tiny and boring' (line 29)"
+    
+    - file: "docs/README.md"
+      type: "navigation"
+      context: "Links to target as part of docs index (line 19)"
+    
+    - file: "docs/contracts/README.md"
+      type: "navigation"
+      context: "References target for kernel design principles (line 70)"
+    
+    - file: "docs/MODULE_SOURCE_PROTOCOL.md"
+      type: "specification"
+      context: "References target for kernel design principles to apply in protocol spec (line 268)"
+    
+    - file: "docs/specs/MOUNT_PLAN_SPECIFICATION.md"
+      type: "specification"
+      context: "Links to target as foundational principles for specification (line 388)"
+    
+    - file: "agents/core-expert.md"
+      type: "agent_instructions"
+      context: "Uses @mention to load target as context for agent behavior (line 62)"
+    
+    - file: "outline-generation-from-existing-doc.yaml"
+      type: "tooling"
+      context: "Uses target as example document in recipe templates"
+  
+  references_to: []
+  
+  key_insight: "This document sits at the mid-level of the documentation hierarchy, synthesizing multiple foundational philosophy documents (leaf nodes) into a single actionable framework with the Linux kernel as a guiding metaphor. It serves as the primary reference for decision-making and is referenced by both top-level navigation documents and peer-level specifications that apply its principles."
+
+sources:
+  - file: "/home/momuno/AI_MADE_Explorations/amplifier-foundation/context/KERNEL_PHILOSOPHY.md"
+    repository: "amplifier-foundation"
+    url: "https://github.com/microsoft/amplifier-foundation/blob/bd0726b0b9755d226718ad026c289e43b38143be/context/KERNEL_PHILOSOPHY.md"
+    commit: "bd0726b0b9755d226718ad026c289e43b38143be"
+    type: "leaf"
+    confidence: "high"
+    hierarchy_level: "foundation"
+    
+    contributes:
+      - "Core Principles (Mechanism Not Policy, Small Stable Boring Kernel)"
+      - "The Linux Kernel Decision Framework (Metaphor Mapping, Decision Playbook, Litmus Tests)"
+      - "Kernel vs Module Boundaries (Mechanisms vs Policies)"
+      - "Evolution Without Breaking Modules (Governance, Stability)"
+      - "Anti-Patterns (Kernel anti-patterns)"
+      - "Governance & Evolution (Kernel high bar/low velocity)"
+    
+    evidence: "Primary authoritative source for kernel philosophy, mechanism vs policy separation, litmus tests for kernel decisions, and governance principles. Provides the Linux kernel metaphor that structures the entire document."
+    
+    inclusion_rationale: "Foundational document that defines the kernel philosophy and provides the central metaphor for Amplifier's architecture. Essential for sections on kernel design, decision frameworks, and governance."
+  
+  - file: "/home/momuno/AI_MADE_Explorations/amplifier-foundation/context/IMPLEMENTATION_PHILOSOPHY.md"
+    repository: "amplifier-foundation"
+    url: "https://github.com/microsoft/amplifier-foundation/blob/bd0726b0b9755d226718ad026c289e43b38143be/context/IMPLEMENTATION_PHILOSOPHY.md"
+    commit: "bd0726b0b9755d226718ad026c289e43b38143be"
+    type: "leaf"
+    confidence: "high"
+    hierarchy_level: "foundation"
+    
+    contributes:
+      - "Core Principles (Ruthless Simplicity)"
+      - "Implementation Patterns (Vertical Slices, Iterative Implementation)"
+      - "Decision Framework (5 Questions: Necessity, Simplicity, Directness, Value, Maintenance)"
+      - "Library vs Custom Code (Evolution Pattern, Decision Guidelines)"
+      - "Testing Strategy (Testing Pyramid: 60% unit, 30% integration, 10% e2e)"
+      - "Error Handling (Common errors, logging, fail fast)"
+      - "Simplicity Guidelines (Areas to embrace/simplify complexity)"
+    
+    evidence: "Definitive source for implementation patterns, decision frameworks, testing strategies, and ruthless simplicity principles. Provides concrete guidelines for when to add complexity and when to aggressively simplify."
+    
+    inclusion_rationale: "Core document for implementation philosophy that complements kernel philosophy with practical development patterns. Essential for sections on simplicity, testing, error handling, and decision-making."
+  
+  - file: "/home/momuno/AI_MADE_Explorations/amplifier-foundation/context/MODULAR_DESIGN_PHILOSOPHY.md"
+    repository: "amplifier-foundation"
+    url: "https://github.com/microsoft/amplifier-foundation/blob/bd0726b0b9755d226718ad026c289e43b38143be/context/MODULAR_DESIGN_PHILOSOPHY.md"
+    commit: "bd0726b0b9755d226718ad026c289e43b38143be"
+    type: "leaf"
+    confidence: "high"
+    hierarchy_level: "foundation"
+    
+    contributes:
+      - "Core Principles (Modular Design)"
+      - "Module Design: Bricks & Studs (LEGO-inspired regeneration philosophy)"
+      - "Regeneration over Patching (AI-driven development patterns)"
+      - "Parallel Development (Multiple variants, rapid iteration)"
+      - "Human Role (Architects vs mechanics, specification-level work)"
+    
+    evidence: "Primary source for Bricks & Studs module design philosophy, regeneration over patching approach, and AI-driven development patterns. Introduces the LEGO metaphor that guides module design."
+    
+    inclusion_rationale: "Essential document for understanding module design philosophy and the regeneration approach that differentiates Amplifier's development model. Critical for sections on modular design and module development patterns."
+  
+  - file: "context/kernel-overview.md"
+    repository: "current"
+    url: "https://github.com/microsoft/amplifier-core/blob/3d2cec937ced74490dd787e8432ef85202f9a945/context/kernel-overview.md"
+    commit: "3d2cec937ced74490dd787e8432ef85202f9a945"
+    type: "leaf"
+    confidence: "high"
+    hierarchy_level: "context"
+    
+    contributes:
+      - "Kernel Overview (What the kernel is and isn't)"
+      - "Core Tenets (Mechanism Not Policy, Event-First Observability, Text-First Inspectable)"
+      - "Module Protocols (Orchestrator, Provider, Tool, Hook, Context)"
+      - "Evolution Without Breaking Modules (Protocol stability, versioning)"
+      - "Litmus Tests (When something belongs in kernel vs module)"
+    
+    evidence: "Strong source for kernel overview, core tenets, and detailed module protocols. Provides implementation-level context for how kernel philosophy manifests in actual contracts and protocols."
+    
+    inclusion_rationale: "Bridges kernel philosophy with concrete implementation details. Provides specific protocol information and litmus tests that make the philosophy actionable for developers."
+
+circular_analysis:
+  excluded:
+    - file: "README.md"
+      repository: "current"
+      hierarchy_level: "top-level"
+      reason: "Higher in abstraction tree - top-level navigation document"
+      evidence: "Line 187: Links to target as '[Design Philosophy](docs/DESIGN_PHILOSOPHY.md) - Kernel principles and patterns'. Serves as main repository index that organizes and points to target."
+      dependency_direction: "README.md → references → DESIGN_PHILOSOPHY.md"
+      circular_risk: "high"
+      validation: "Top-level navigation documents cannot be sources for documents they index"
+    
+    - file: "bundle.md"
+      repository: "current"
+      hierarchy_level: "top-level"
+      reason: "Higher in abstraction tree - bundle descriptor"
+      evidence: "Line 29: Describes target as '**DESIGN_PHILOSOPHY.md** - Why the kernel is tiny and boring'. Lists target in key documentation section."
+      dependency_direction: "bundle.md → describes → DESIGN_PHILOSOPHY.md"
+      circular_risk: "high"
+      validation: "Bundle descriptors cannot be sources for documents they describe"
+    
+    - file: "docs/specs/MOUNT_PLAN_SPECIFICATION.md"
+      repository: "current"
+      hierarchy_level: "peer-level"
+      reason: "Peer-level specification that applies target principles"
+      evidence: "Line 388: Links to target in Related Documentation as '[DESIGN_PHILOSOPHY.md](../DESIGN_PHILOSOPHY.md) - Kernel design principles'. Specification applies principles from target."
+      dependency_direction: "MOUNT_PLAN_SPECIFICATION.md → applies principles from → DESIGN_PHILOSOPHY.md"
+      circular_risk: "high"
+      validation: "Specifications that apply principles from target cannot be sources for that target"
+    
+    - file: "agents/core-expert.md"
+      repository: "current"
+      hierarchy_level: "peer-level"
+      reason: "Peer-level agent instructions that use target as context"
+      evidence: "Line 62: @mentions target to load as context '@core:docs/DESIGN_PHILOSOPHY.md - Why the kernel is tiny and boring'. Agent configured to USE target as reference material."
+      dependency_direction: "core-expert.md → uses as context → DESIGN_PHILOSOPHY.md"
+      circular_risk: "high"
+      validation: "Agent instructions that reference target as context cannot be sources for that target"
+  
+  validation_rules:
+    - "No circular references in dependency tree"
+    - "Information flows upward from sources to target, references flow downward from target to dependents"
+    - "Source files must be at same or lower abstraction level than target"
+    - "Documents that reference, describe, or use the target cannot be sources for that target"
+    - "All circular checks must pass with 'high' circular risk marking exclusions"
+  
+  statistics:
+    total_sources: 4
+    total_exclusions: 4
+    top_level_exclusions: 2
+    peer_level_exclusions: 2
+    all_circular_checks: "PASS"
+    all_sources_verified: true
+    ready_for_regeneration: true
+
+dependency_tree: |
+  Amplifier Documentation Hierarchy (for DESIGN_PHILOSOPHY.md)
+  
+  TOP LEVEL (Navigation & Organization)
+  ├── README.md ───────────────────────┐
+  │   └── Links to: DESIGN_PHILOSOPHY ──┼──── ❌ EXCLUDED (higher level)
+  │                                     │
+  ├── bundle.md ───────────────────────┤
+  │   └── Describes: DESIGN_PHILOSOPHY ─┘
+  │
+  MID LEVEL (Synthesis & Frameworks)
+  ├── 📄 DESIGN_PHILOSOPHY.md ◄─────────────── TARGET DOCUMENT
+  │   │
+  │   ├── Synthesizes from: ──────────────────┐
+  │   │                                       │
+  │   │   FOUNDATION SOURCES (amplifier-foundation)
+  │   │   ├── ✅ KERNEL_PHILOSOPHY.md        │ (leaf - foundation)
+  │   │   ├── ✅ IMPLEMENTATION_PHILOSOPHY.md │ (leaf - foundation)
+  │   │   └── ✅ MODULAR_DESIGN_PHILOSOPHY.md │ (leaf - foundation)
+  │   │                                       │
+  │   │   CONTEXT SOURCES (current repo)      │
+  │   │   └── ✅ kernel-overview.md           │ (leaf - context)
+  │   │                                       │
+  │   └── Referenced by: ──────────────────────┘
+  │       │
+  │       ├── docs/README.md (index)
+  │       ├── docs/contracts/README.md (navigation)
+  │       ├── docs/MODULE_SOURCE_PROTOCOL.md (spec)
+  │       ├── docs/specs/MOUNT_PLAN_SPECIFICATION.md ❌ EXCLUDED (peer applies principles)
+  │       └── agents/core-expert.md ❌ EXCLUDED (peer uses as context)
+  │
+  PEER LEVEL (Specifications & Implementations)
+  ├── docs/contracts/*.md
+  ├── docs/specs/*.md
+  └── agents/*.md
+  
+  LEGEND:
+  ✅ = Valid source (lower or same level, no circular refs)
+  ❌ = Excluded (higher level or creates circular reference)
+  ◄──── = Target document being regenerated
+  
+  FLOW PRINCIPLE:
+  Information flows UP: leaf sources → mid-level synthesis → top-level navigation
+  References flow DOWN: top-level → mid-level → specifications/implementations
+
+synthesis_strategy:
+  approach: "Multi-source synthesis with metaphor-driven organization"
+  
+  metaphor_framework: "Linux kernel as organizing principle"
+  
+  source_integration:
+    - source: "KERNEL_PHILOSOPHY.md"
+      role: "Primary metaphor and kernel design principles"
+      sections: ["Core Principles", "Linux Kernel Decision Framework", "Kernel vs Module Boundaries", "Governance"]
+    
+    - source: "IMPLEMENTATION_PHILOSOPHY.md"
+      role: "Implementation patterns and decision frameworks"
+      sections: ["Ruthless Simplicity", "Implementation Patterns", "Decision Framework", "Testing Strategy"]
+    
+    - source: "MODULAR_DESIGN_PHILOSOPHY.md"
+      role: "Module design philosophy and regeneration approach"
+      sections: ["Modular Design", "Bricks & Studs", "AI-Driven Development"]
+    
+    - source: "kernel-overview.md"
+      role: "Concrete implementation details and protocols"
+      sections: ["Core Tenets", "Module Protocols", "Litmus Tests"]
+  
+  synthesis_patterns:
+    - pattern: "Metaphor mapping"
+      description: "Map Linux kernel concepts to Amplifier architecture"
+      example: "Linux kernel modules → Amplifier modules (Orchestrators, Providers, Tools, Hooks)"
+    
+    - pattern: "Multi-level integration"
+      description: "Integrate philosophy (why), principles (what), and patterns (how)"
+      example: "Mechanism Not Policy (philosophy) → Module protocols (principles) → Bricks & Studs (patterns)"
+    
+    - pattern: "Decision framework synthesis"
+      description: "Combine multiple decision-making approaches into unified framework"
+      example: "5 Questions + Litmus Tests + Library vs Custom = Complete decision playbook"
+    
+    - pattern: "Checklist generation"
+      description: "Distill principles into actionable quick reference checklists"
+      example: "Kernel work checklist, Module work checklist, Design decision checklist"
+  
+  target_audience:
+    - "Kernel contributors (high bar decisions)"
+    - "Module developers (fast iteration)"
+    - "Architects (system design)"
+    - "All developers (decision-making)"
+
+generated:
+  date: "2026-01-07T15:52:44-08:00"
+  recipe_version: "1.0.0"
+  current_commit: "3d2cec937ced74490dd787e8432ef85202f9a945"
+  amplifier_foundation_commit: "bd0726b0b9755d226718ad026c289e43b38143be"
+  
+  validation:
+    all_sources_verified: true
+    all_circular_checks: "PASS"
+    all_urls_valid: true
+    commit_hashes_verified: true
+    ready_for_regeneration: true
+  
+  regeneration_guidance:
+    - "Read all 4 source files completely before synthesis"
+    - "Use Linux kernel metaphor as primary organizing principle"
+    - "Integrate philosophy (why), principles (what), and patterns (how) at each level"
+    - "Create actionable checklists from abstract principles"
+    - "Maintain clear boundaries between kernel and module guidance"
+    - "Preserve decision frameworks and litmus tests from sources"
+    - "Include concrete examples from IMPLEMENTATION_PHILOSOPHY.md"
+    - "Emphasize regeneration over patching from MODULAR_DESIGN_PHILOSOPHY.md"
+  
+  quality_checks:
+    - "Verify Linux kernel metaphor is consistent throughout"
+    - "Ensure all 6 core principles are covered with equal depth"
+    - "Validate decision frameworks are actionable and complete"
+    - "Check that checklists align with principles in body"
+    - "Confirm anti-patterns are specific and justified"
+    - "Verify governance guidance differentiates kernel vs module evolution"

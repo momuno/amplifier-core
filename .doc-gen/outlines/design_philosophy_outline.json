@@ -1,0 +1,566 @@
+{
+  "_meta": {
+    "name": "design-philosophy-outline",
+    "document_instruction": "Generate a comprehensive design philosophy document that synthesizes kernel philosophy, implementation patterns, and modular design principles. Use the Linux kernel as a guiding metaphor to explain architectural decisions, boundaries, and evolution strategies. Maintain clear, authoritative tone while being accessible and practical. Each section should build on prior sections to create a cohesive philosophical framework.",
+    "model": "claude-sonnet-4-20250514",
+    "max_response_tokens": 8000,
+    "temperature": 0.2
+  },
+  "document": {
+    "title": "# Amplifier Design Philosophy",
+    "output": "docs/DESIGN_PHILOSOPHY.md",
+    "sections": [
+      {
+        "heading": "# Amplifier Design Philosophy",
+        "level": 1,
+        "prompt": "Establish the document's purpose with a compelling opening that captures the essence of the architectural philosophy. Identify the most compelling philosophical statement from the sources and extract the central metaphor or framework that organizes the thinking. Find any anchor quotes that encapsulate the core philosophy. Present as philosophy statement followed by supporting quote in an authoritative but accessible tone.",
+        "sources": [
+          {
+            "file": "https://github.com/microsoft/amplifier-foundation/blob/bd0726b0b9755d226718ad026c289e43b38143be/context/KERNEL_PHILOSOPHY.md",
+            "reasoning": "Core quote 'The center stays still so the edges can move fast' - foundational philosophy that anchors the entire document",
+            "commit": "bd0726b0b9755d226718ad026c289e43b38143be"
+          },
+          {
+            "file": "https://github.com/microsoft/amplifier-core/blob/3d2cec937ced74490dd787e8432ef85202f9a945/context/kernel-overview.md",
+            "reasoning": "Opening quote and kernel overview framing that provides local context for the philosophy",
+            "commit": "3d2cec937ced74490dd787e8432ef85202f9a945"
+          }
+        ],
+        "sections": [
+          {
+            "heading": "## Core Principles",
+            "level": 2,
+            "prompt": "Establish the foundational principles that guide all architectural and implementation decisions. Extract the core principles from philosophy sources - for each principle discovered, identify its definition and implications. Synthesize how principles relate to and reinforce each other. Present as numbered list with each principle including bold title, definition, explanation, and implications in clear and definitive tone.",
+            "sources": [
+              {
+                "file": "https://github.com/microsoft/amplifier-foundation/blob/bd0726b0b9755d226718ad026c289e43b38143be/context/KERNEL_PHILOSOPHY.md",
+                "reasoning": "Mechanism not policy principle, backward compatibility emphasis, and core kernel design tenets",
+                "commit": "bd0726b0b9755d226718ad026c289e43b38143be"
+              },
+              {
+                "file": "https://github.com/microsoft/amplifier-foundation/blob/bd0726b0b9755d226718ad026c289e43b38143be/context/IMPLEMENTATION_PHILOSOPHY.md",
+                "reasoning": "Ruthless simplicity principle, KISS philosophy, and practical implementation guidance",
+                "commit": "bd0726b0b9755d226718ad026c289e43b38143be"
+              },
+              {
+                "file": "https://github.com/microsoft/amplifier-foundation/blob/bd0726b0b9755d226718ad026c289e43b38143be/context/MODULAR_DESIGN_PHILOSOPHY.md",
+                "reasoning": "Modular design concepts and bricks metaphor that introduces regeneration philosophy",
+                "commit": "bd0726b0b9755d226718ad026c289e43b38143be"
+              },
+              {
+                "file": "https://github.com/microsoft/amplifier-core/blob/3d2cec937ced74490dd787e8432ef85202f9a945/context/kernel-overview.md",
+                "reasoning": "Mechanism not policy explanation and small/stable/boring kernel principle with kernel-specific framing",
+                "commit": "3d2cec937ced74490dd787e8432ef85202f9a945"
+              }
+            ],
+            "sections": []
+          },
+          {
+            "heading": "## The Linux Kernel Decision Framework",
+            "level": 2,
+            "prompt": "Provide a structured decision-making framework for architectural choices using the organizing metaphor from sources. Identify the primary metaphor or model used for architectural decisions and extract the decision rules and criteria from this framework. Map how the metaphor translates to Amplifier architecture and synthesize concrete decision-making guidance. Present framework introduction followed by subsections for mapping and playbook in explanatory and practical tone.",
+            "sources": [
+              {
+                "file": "https://github.com/microsoft/amplifier-foundation/blob/bd0726b0b9755d226718ad026c289e43b38143be/context/KERNEL_PHILOSOPHY.md",
+                "reasoning": "Litmus test framework, two-implementation rule, and decision criteria that form the core decision structure",
+                "commit": "bd0726b0b9755d226718ad026c289e43b38143be"
+              },
+              {
+                "file": "https://github.com/microsoft/amplifier-core/blob/3d2cec937ced74490dd787e8432ef85202f9a945/context/kernel-overview.md",
+                "reasoning": "Litmus test phrasing and decision playbook examples that operationalize the framework",
+                "commit": "3d2cec937ced74490dd787e8432ef85202f9a945"
+              }
+            ],
+            "sections": [
+              {
+                "heading": "### Metaphor Mapping",
+                "level": 3,
+                "prompt": "Translate the organizing metaphor into concrete Amplifier architectural concepts. Extract the key elements of the organizing metaphor from sources and map each metaphor element to corresponding Amplifier concept. Clarify what each architectural layer represents. Present as comparison table or mapping list in clear and precise tone.",
+                "sources": [
+                  {
+                    "file": "https://github.com/microsoft/amplifier-foundation/blob/bd0726b0b9755d226718ad026c289e43b38143be/context/KERNEL_PHILOSOPHY.md",
+                    "reasoning": "Linux kernel analogy and Ring 0 concept that establishes kernel-as-foundation metaphor",
+                    "commit": "bd0726b0b9755d226718ad026c289e43b38143be"
+                  },
+                  {
+                    "file": "https://github.com/microsoft/amplifier-core/blob/3d2cec937ced74490dd787e8432ef85202f9a945/context/kernel-overview.md",
+                    "reasoning": "Kernel responsibilities mapping that provides concrete examples of metaphor application",
+                    "commit": "3d2cec937ced74490dd787e8432ef85202f9a945"
+                  }
+                ],
+                "sections": []
+              },
+              {
+                "heading": "### Decision Playbook",
+                "level": 3,
+                "prompt": "Provide concrete decision procedures and test cases for applying the framework. Extract decision tests and criteria from sources and identify the key questions to ask when making architectural decisions. Synthesize concrete scenarios showing framework application and build a decision tree or procedure from the guidance. Present as numbered decision steps or scenarios with outcomes in practical and procedural tone.",
+                "sources": [
+                  {
+                    "file": "https://github.com/microsoft/amplifier-foundation/blob/bd0726b0b9755d226718ad026c289e43b38143be/context/KERNEL_PHILOSOPHY.md",
+                    "reasoning": "Decision criteria and examples of kernel vs module decisions including two-implementation rule that playbook operationalizes",
+                    "commit": "bd0726b0b9755d226718ad026c289e43b38143be"
+                  },
+                  {
+                    "file": "https://github.com/microsoft/amplifier-core/blob/3d2cec937ced74490dd787e8432ef85202f9a945/context/kernel-overview.md",
+                    "reasoning": "Specific decision examples and edge cases with litmus test that provides decision playbook structure",
+                    "commit": "3d2cec937ced74490dd787e8432ef85202f9a945"
+                  }
+                ],
+                "sections": []
+              }
+            ]
+          },
+          {
+            "heading": "## Kernel vs Module Boundaries",
+            "level": 2,
+            "prompt": "Define the architectural boundaries between core system and extensible components. Extract what belongs in core system vs extensions from sources and identify the principles that determine boundary placement. Synthesize rules for maintaining boundary integrity over time. Present with subsections for each side of boundary plus evolution in clear and definitive tone.",
+            "sources": [
+              {
+                "file": "https://github.com/microsoft/amplifier-foundation/blob/bd0726b0b9755d226718ad026c289e43b38143be/context/KERNEL_PHILOSOPHY.md",
+                "reasoning": "Mechanism vs policy distinction and boundary definitions that form the conceptual framework",
+                "commit": "bd0726b0b9755d226718ad026c289e43b38143be"
+              },
+              {
+                "file": "https://github.com/microsoft/amplifier-core/blob/3d2cec937ced74490dd787e8432ef85202f9a945/context/kernel-overview.md",
+                "reasoning": "Specific kernel responsibilities and module protocols list that provides concrete boundary examples",
+                "commit": "3d2cec937ced74490dd787e8432ef85202f9a945"
+              },
+              {
+                "file": "https://github.com/microsoft/amplifier-foundation/blob/bd0726b0b9755d226718ad026c289e43b38143be/context/IMPLEMENTATION_PHILOSOPHY.md",
+                "reasoning": "Implementation guidance for maintaining boundaries in practice with simplicity principles",
+                "commit": "bd0726b0b9755d226718ad026c289e43b38143be"
+              }
+            ],
+            "sections": [
+              {
+                "heading": "### Kernel Responsibilities (Mechanisms)",
+                "level": 3,
+                "prompt": "Define what belongs in the core system layer. Extract core system responsibilities from sources and identify the pattern distinguishing core from extension concerns. Synthesize concrete examples of what belongs in core. Present as bulleted list with categories and examples in precise and comprehensive tone.",
+                "sources": [
+                  {
+                    "file": "https://github.com/microsoft/amplifier-foundation/blob/bd0726b0b9755d226718ad026c289e43b38143be/context/KERNEL_PHILOSOPHY.md",
+                    "reasoning": "Definition of mechanisms and what kernel provides in the mechanism vs policy framework",
+                    "commit": "bd0726b0b9755d226718ad026c289e43b38143be"
+                  },
+                  {
+                    "file": "https://github.com/microsoft/amplifier-core/blob/3d2cec937ced74490dd787e8432ef85202f9a945/context/kernel-overview.md",
+                    "reasoning": "Specific mechanism examples and protocol listings that provide concrete protocol catalog",
+                    "commit": "3d2cec937ced74490dd787e8432ef85202f9a945"
+                  }
+                ],
+                "sections": []
+              },
+              {
+                "heading": "### Module Responsibilities (Policies)",
+                "level": 3,
+                "prompt": "Define what belongs in the extension/module layer. Extract module responsibilities from sources and identify the pattern distinguishing extension from core concerns. Synthesize concrete examples of what belongs in modules. Present as bulleted list with categories and examples in precise and comprehensive tone.",
+                "sources": [
+                  {
+                    "file": "https://github.com/microsoft/amplifier-foundation/blob/bd0726b0b9755d226718ad026c289e43b38143be/context/KERNEL_PHILOSOPHY.md",
+                    "reasoning": "Definition of policies and what modules decide in the policy-at-edges principle",
+                    "commit": "bd0726b0b9755d226718ad026c289e43b38143be"
+                  },
+                  {
+                    "file": "https://github.com/microsoft/amplifier-core/blob/3d2cec937ced74490dd787e8432ef85202f9a945/context/kernel-overview.md",
+                    "reasoning": "Module policy examples that show concrete policy decisions belonging in modules",
+                    "commit": "3d2cec937ced74490dd787e8432ef85202f9a945"
+                  }
+                ],
+                "sections": []
+              },
+              {
+                "heading": "### Evolution Without Breaking Modules",
+                "level": 3,
+                "prompt": "Establish principles and strategies for evolving core system while maintaining boundary stability. Extract evolution and compatibility principles from sources and identify strategies for non-breaking changes. Synthesize rules for when breaking changes are acceptable. Present as numbered principles with explanations in prescriptive and practical tone.",
+                "sources": [
+                  {
+                    "file": "https://github.com/microsoft/amplifier-foundation/blob/bd0726b0b9755d226718ad026c289e43b38143be/context/KERNEL_PHILOSOPHY.md",
+                    "reasoning": "Additive evolution principle, two-implementation rule, and backward compatibility emphasis that form evolution strategy",
+                    "commit": "bd0726b0b9755d226718ad026c289e43b38143be"
+                  },
+                  {
+                    "file": "https://github.com/microsoft/amplifier-core/blob/3d2cec937ced74490dd787e8432ef85202f9a945/context/kernel-overview.md",
+                    "reasoning": "Evolution strategy specifics and deprecation discipline that operationalize the principles",
+                    "commit": "3d2cec937ced74490dd787e8432ef85202f9a945"
+                  }
+                ],
+                "sections": []
+              }
+            ]
+          },
+          {
+            "heading": "## Module Design: Bricks & Studs",
+            "level": 2,
+            "prompt": "Establish the module design philosophy and patterns for building regeneratable components. Identify the primary module design metaphor from sources and extract design principles and practices. Synthesize how the approach enables AI-driven development and identify the benefits that emerge from this design. Present with subsections for model, practices, and benefits in explanatory and inspiring tone.",
+            "sources": [
+              {
+                "file": "https://github.com/microsoft/amplifier-foundation/blob/bd0726b0b9755d226718ad026c289e43b38143be/context/MODULAR_DESIGN_PHILOSOPHY.md",
+                "reasoning": "Complete source for LEGO metaphor, brick/stud definitions, AI builder concept, and regeneration principle",
+                "commit": "bd0726b0b9755d226718ad026c289e43b38143be"
+              }
+            ],
+            "sections": [
+              {
+                "heading": "### The LEGO Model",
+                "level": 3,
+                "prompt": "Explain the module design metaphor and its key concepts. Extract the module design metaphor from sources and identify the key elements and concepts in the metaphor. Explain how the metaphor maps to actual module design. Present as explanatory prose with term definitions in clear and illustrative tone.",
+                "sources": [
+                  {
+                    "file": "https://github.com/microsoft/amplifier-foundation/blob/bd0726b0b9755d226718ad026c289e43b38143be/context/MODULAR_DESIGN_PHILOSOPHY.md",
+                    "reasoning": "LEGO brick metaphor with brick/stud/blueprint/builder definitions that establish the complete model",
+                    "commit": "bd0726b0b9755d226718ad026c289e43b38143be"
+                  }
+                ],
+                "sections": []
+              },
+              {
+                "heading": "### Key Practices",
+                "level": 3,
+                "prompt": "Define the essential practices for implementing the module design philosophy. Extract module design practices from sources and identify the principles behind each practice. Synthesize how practices work together to enable regeneration. Present as numbered or bulleted list of practices with explanations in instructional and practical tone.",
+                "sources": [
+                  {
+                    "file": "https://github.com/microsoft/amplifier-foundation/blob/bd0726b0b9755d226718ad026c289e43b38143be/context/MODULAR_DESIGN_PHILOSOPHY.md",
+                    "reasoning": "Self-contained modules, standard interfaces, regeneration over patching, and human as architect concepts",
+                    "commit": "bd0726b0b9755d226718ad026c289e43b38143be"
+                  },
+                  {
+                    "file": "https://github.com/microsoft/amplifier-foundation/blob/bd0726b0b9755d226718ad026c289e43b38143be/context/IMPLEMENTATION_PHILOSOPHY.md",
+                    "reasoning": "Modular directory structure guidance and public interface patterns for practical implementation",
+                    "commit": "bd0726b0b9755d226718ad026c289e43b38143be"
+                  }
+                ],
+                "sections": []
+              },
+              {
+                "heading": "### Benefits",
+                "level": 3,
+                "prompt": "Articulate the value and advantages of the module design approach. Extract benefits and advantages from sources and identify what the approach enables that alternatives don't. Synthesize how benefits connect to practices. Present as bulleted list of benefit statements in value-focused and compelling tone.",
+                "sources": [
+                  {
+                    "file": "https://github.com/microsoft/amplifier-foundation/blob/bd0726b0b9755d226718ad026c289e43b38143be/context/MODULAR_DESIGN_PHILOSOPHY.md",
+                    "reasoning": "Parallel development benefit, rapid iteration, and fearless innovation enabled by the approach",
+                    "commit": "bd0726b0b9755d226718ad026c289e43b38143be"
+                  }
+                ],
+                "sections": []
+              }
+            ]
+          },
+          {
+            "heading": "## Implementation Patterns",
+            "level": 2,
+            "prompt": "Provide concrete patterns and practices for implementation work. Extract implementation patterns from sources and organize patterns by implementation concern (development, testing, quality, etc.). Synthesize practical guidance for each pattern area. Present with subsections for each pattern area in practical and prescriptive tone.",
+            "sources": [
+              {
+                "file": "https://github.com/microsoft/amplifier-foundation/blob/bd0726b0b9755d226718ad026c289e43b38143be/context/IMPLEMENTATION_PHILOSOPHY.md",
+                "reasoning": "Primary source for vertical slices, 80/20 principle, testing pyramid, and all implementation pattern guidance",
+                "commit": "bd0726b0b9755d226718ad026c289e43b38143be"
+              }
+            ],
+            "sections": [
+              {
+                "heading": "### Vertical Slices",
+                "level": 3,
+                "prompt": "Define the vertical slice development approach. Extract vertical slice guidance from sources and identify what makes a good vertical slice. Synthesize how to apply the approach. Present as explanatory prose with bulleted practices in instructional and clear tone.",
+                "sources": [
+                  {
+                    "file": "https://github.com/microsoft/amplifier-foundation/blob/bd0726b0b9755d226718ad026c289e43b38143be/context/IMPLEMENTATION_PHILOSOPHY.md",
+                    "reasoning": "Vertical slice implementation approach and end-to-end functionality focus with complete methodology",
+                    "commit": "bd0726b0b9755d226718ad026c289e43b38143be"
+                  }
+                ],
+                "sections": []
+              },
+              {
+                "heading": "### Iterative Development",
+                "level": 3,
+                "prompt": "Define the iterative development approach and prioritization strategy. Extract iterative development guidance from sources and identify prioritization principles and heuristics. Synthesize how to validate and refine iteratively. Present as bulleted list of iterative practices in practical and pragmatic tone.",
+                "sources": [
+                  {
+                    "file": "https://github.com/microsoft/amplifier-foundation/blob/bd0726b0b9755d226718ad026c289e43b38143be/context/IMPLEMENTATION_PHILOSOPHY.md",
+                    "reasoning": "80/20 principle and iterative implementation guidance with validation approach",
+                    "commit": "bd0726b0b9755d226718ad026c289e43b38143be"
+                  }
+                ],
+                "sections": []
+              },
+              {
+                "heading": "### Testing Strategy",
+                "level": 3,
+                "prompt": "Define comprehensive testing approach and quality assurance strategy. Extract testing strategy from sources and identify test level priorities and ratios if specified. Synthesize when to use different testing approaches and clarify quality goals and how testing achieves them. Present as organized sections for testing levels and approaches in balanced and comprehensive tone.",
+                "sources": [
+                  {
+                    "file": "https://github.com/microsoft/amplifier-foundation/blob/bd0726b0b9755d226718ad026c289e43b38143be/context/IMPLEMENTATION_PHILOSOPHY.md",
+                    "reasoning": "Testing pyramid ratios (60% unit, 30% integration, 10% e2e) and complete testing philosophy",
+                    "commit": "bd0726b0b9755d226718ad026c289e43b38143be"
+                  }
+                ],
+                "sections": []
+              },
+              {
+                "heading": "### Error Handling",
+                "level": 3,
+                "prompt": "Define error handling philosophy and practices. Extract error handling guidance from sources and identify principles distinguishing good from poor error handling. Synthesize practices for different error scenarios. Present as bulleted list of error handling practices in clear and practical tone.",
+                "sources": [
+                  {
+                    "file": "https://github.com/microsoft/amplifier-foundation/blob/bd0726b0b9755d226718ad026c289e43b38143be/context/IMPLEMENTATION_PHILOSOPHY.md",
+                    "reasoning": "Error handling approach and fail fast philosophy with complete error strategy",
+                    "commit": "bd0726b0b9755d226718ad026c289e43b38143be"
+                  }
+                ],
+                "sections": []
+              },
+              {
+                "heading": "### Simplicity Guidelines",
+                "level": 3,
+                "prompt": "Provide comprehensive guidance on maintaining simplicity in implementation. Extract simplicity principles from sources and identify when complexity is justified vs when to aggressively simplify. Synthesize decision guidance for complexity trade-offs and organize by concern area or decision type. Present as two contrasting lists: areas to embrace complexity vs areas to simplify in clear and directive tone.",
+                "sources": [
+                  {
+                    "file": "https://github.com/microsoft/amplifier-foundation/blob/bd0726b0b9755d226718ad026c289e43b38143be/context/IMPLEMENTATION_PHILOSOPHY.md",
+                    "reasoning": "Areas to embrace and aggressively simplify complexity with complete complexity framework",
+                    "commit": "bd0726b0b9755d226718ad026c289e43b38143be"
+                  }
+                ],
+                "sections": []
+              }
+            ]
+          },
+          {
+            "heading": "## Decision Framework",
+            "level": 2,
+            "prompt": "Provide structured decision-making tools for implementation choices. Extract decision frameworks and criteria from sources and identify key questions that guide good decisions. Synthesize guidance for common decision types (e.g., library selection) and organize by decision type or concern area. Present framework with subsections for specific decision types in structured and practical tone.",
+            "sources": [
+              {
+                "file": "https://github.com/microsoft/amplifier-foundation/blob/bd0726b0b9755d226718ad026c289e43b38143be/context/IMPLEMENTATION_PHILOSOPHY.md",
+                "reasoning": "5-question decision framework and library vs custom code guidance with complete decision methodology",
+                "commit": "bd0726b0b9755d226718ad026c289e43b38143be"
+              }
+            ],
+            "sections": [
+              {
+                "heading": "### Library vs Custom Code",
+                "level": 3,
+                "prompt": "Provide detailed guidance for library selection vs custom implementation decisions. Extract library vs custom code guidance from sources and identify decision criteria favoring each approach. Synthesize evolution patterns (when to switch approaches) and build decision procedure from the guidance. Present as structured comparison with decision criteria in balanced and nuanced tone.",
+                "sources": [
+                  {
+                    "file": "https://github.com/microsoft/amplifier-foundation/blob/bd0726b0b9755d226718ad026c289e43b38143be/context/IMPLEMENTATION_PHILOSOPHY.md",
+                    "reasoning": "Library selection criteria, custom code justifications, evolution patterns, and complete trade-off evaluation framework",
+                    "commit": "bd0726b0b9755d226718ad026c289e43b38143be"
+                  }
+                ],
+                "sections": []
+              }
+            ]
+          },
+          {
+            "heading": "## Anti-Patterns (What to Resist)",
+            "level": 2,
+            "prompt": "Identify common mistakes and anti-patterns to avoid across all areas. Extract anti-patterns and red flags from sources and organize by area or concern (e.g., core development vs module development). Identify patterns across anti-patterns (common themes) and synthesize what makes each an anti-pattern (why it's problematic). Present with subsections by area and bulleted lists of anti-patterns in warning-focused but constructive tone.",
+            "sources": [
+              {
+                "file": "https://github.com/microsoft/amplifier-foundation/blob/bd0726b0b9755d226718ad026c289e43b38143be/context/KERNEL_PHILOSOPHY.md",
+                "reasoning": "Red flags for kernel development and anti-patterns to avoid in kernel and module work",
+                "commit": "bd0726b0b9755d226718ad026c289e43b38143be"
+              },
+              {
+                "file": "https://github.com/microsoft/amplifier-foundation/blob/bd0726b0b9755d226718ad026c289e43b38143be/context/IMPLEMENTATION_PHILOSOPHY.md",
+                "reasoning": "Simplification anti-patterns and areas to aggressively simplify with implementation warnings",
+                "commit": "bd0726b0b9755d226718ad026c289e43b38143be"
+              }
+            ],
+            "sections": [
+              {
+                "heading": "### In Kernel Development",
+                "level": 3,
+                "prompt": "Identify anti-patterns specific to core system development. Extract core system anti-patterns from sources and identify what constitutes boundary violations. Synthesize warning signs of scope creep. Present as bulleted list of anti-patterns with brief explanations in clear and cautionary tone.",
+                "sources": [
+                  {
+                    "file": "https://github.com/microsoft/amplifier-foundation/blob/bd0726b0b9755d226718ad026c289e43b38143be/context/KERNEL_PHILOSOPHY.md",
+                    "reasoning": "Kernel-specific anti-patterns and red flags from kernel development section",
+                    "commit": "bd0726b0b9755d226718ad026c289e43b38143be"
+                  }
+                ],
+                "sections": []
+              },
+              {
+                "heading": "### In Module Development",
+                "level": 3,
+                "prompt": "Identify anti-patterns specific to module/extension development. Extract module development anti-patterns from sources and identify common module design mistakes. Synthesize integration anti-patterns. Present as bulleted list of anti-patterns with brief explanations in clear and cautionary tone.",
+                "sources": [
+                  {
+                    "file": "https://github.com/microsoft/amplifier-foundation/blob/bd0726b0b9755d226718ad026c289e43b38143be/context/KERNEL_PHILOSOPHY.md",
+                    "reasoning": "Module-side anti-patterns from red flags section covering module development mistakes",
+                    "commit": "bd0726b0b9755d226718ad026c289e43b38143be"
+                  }
+                ],
+                "sections": []
+              },
+              {
+                "heading": "### In Design",
+                "level": 3,
+                "prompt": "Identify design-level anti-patterns that cut across areas. Extract design anti-patterns from sources and identify over-engineering indicators. Synthesize architectural mistakes. Present as bulleted list of anti-patterns with brief explanations in clear and cautionary tone.",
+                "sources": [
+                  {
+                    "file": "https://github.com/microsoft/amplifier-foundation/blob/bd0726b0b9755d226718ad026c289e43b38143be/context/IMPLEMENTATION_PHILOSOPHY.md",
+                    "reasoning": "Design anti-patterns and over-engineering warnings from simplification guidance",
+                    "commit": "bd0726b0b9755d226718ad026c289e43b38143be"
+                  }
+                ],
+                "sections": []
+              },
+              {
+                "heading": "### In Process",
+                "level": 3,
+                "prompt": "Identify process and workflow anti-patterns. Extract process anti-patterns from sources and identify workflow mistakes. Synthesize collaboration and communication pitfalls. Present as bulleted list of anti-patterns with brief explanations in clear and cautionary tone.",
+                "sources": [
+                  {
+                    "file": "https://github.com/microsoft/amplifier-foundation/blob/bd0726b0b9755d226718ad026c289e43b38143be/context/IMPLEMENTATION_PHILOSOPHY.md",
+                    "reasoning": "Process anti-patterns implied by iterative development section and development approach guidance",
+                    "commit": "bd0726b0b9755d226718ad026c289e43b38143be"
+                  }
+                ],
+                "sections": []
+              }
+            ]
+          },
+          {
+            "heading": "## Governance & Evolution",
+            "level": 2,
+            "prompt": "Define governance processes and evolution strategies for maintaining system integrity. Extract governance and change management guidance from sources and identify different requirements for different areas (core vs modules). Synthesize review criteria and approval processes and clarify how to evolve while maintaining stability. Present with subsections for different governance areas in formal but clear tone.",
+            "sources": [
+              {
+                "file": "https://github.com/microsoft/amplifier-foundation/blob/bd0726b0b9755d226718ad026c289e43b38143be/context/KERNEL_PHILOSOPHY.md",
+                "reasoning": "Governance framework, kernel change process, and high bar/low velocity principle that defines change management",
+                "commit": "bd0726b0b9755d226718ad026c289e43b38143be"
+              },
+              {
+                "file": "https://github.com/microsoft/amplifier-core/blob/3d2cec937ced74490dd787e8432ef85202f9a945/context/kernel-overview.md",
+                "reasoning": "Evolution strategy details that complement governance framework",
+                "commit": "3d2cec937ced74490dd787e8432ef85202f9a945"
+              }
+            ],
+            "sections": [
+              {
+                "heading": "### Kernel Changes",
+                "level": 3,
+                "prompt": "Define governance requirements for core system changes. Extract core system governance from sources and identify what makes core changes high-bar. Synthesize compatibility and stability requirements and clarify review and approval criteria. Present as numbered or bulleted requirements list in formal and prescriptive tone.",
+                "sources": [
+                  {
+                    "file": "https://github.com/microsoft/amplifier-foundation/blob/bd0726b0b9755d226718ad026c289e43b38143be/context/KERNEL_PHILOSOPHY.md",
+                    "reasoning": "Kernel change requirements, high bar principle, and review process from governance section",
+                    "commit": "bd0726b0b9755d226718ad026c289e43b38143be"
+                  }
+                ],
+                "sections": []
+              },
+              {
+                "heading": "### Module Changes",
+                "level": 3,
+                "prompt": "Define governance requirements for module/extension changes. Extract module governance from sources and identify what makes module changes lower-bar. Synthesize freedom and constraints for modules and clarify how modules can evolve independently. Present as numbered or bulleted requirements list in enabling but bounded tone.",
+                "sources": [
+                  {
+                    "file": "https://github.com/microsoft/amplifier-foundation/blob/bd0726b0b9755d226718ad026c289e43b38143be/context/KERNEL_PHILOSOPHY.md",
+                    "reasoning": "Module evolution freedom and independent versioning from governance section showing contrast to kernel rigidity",
+                    "commit": "bd0726b0b9755d226718ad026c289e43b38143be"
+                  }
+                ],
+                "sections": []
+              }
+            ]
+          },
+          {
+            "heading": "## Quick Reference",
+            "level": 2,
+            "prompt": "Provide concise checklists and quick-lookup guidance for common situations. Synthesize key guidance from earlier sections into concise form and organize by work context or role (core dev, module dev, design). Extract the most critical questions and criteria and create actionable checklists from detailed guidance. Present with subsections by work area and bulleted checklists in concise and actionable tone.",
+            "sources": [
+              {
+                "file": "https://github.com/microsoft/amplifier-foundation/blob/bd0726b0b9755d226718ad026c289e43b38143be/context/KERNEL_PHILOSOPHY.md",
+                "reasoning": "Kernel work principles summary that forms basis for kernel checklist",
+                "commit": "bd0726b0b9755d226718ad026c289e43b38143be"
+              },
+              {
+                "file": "https://github.com/microsoft/amplifier-foundation/blob/bd0726b0b9755d226718ad026c289e43b38143be/context/IMPLEMENTATION_PHILOSOPHY.md",
+                "reasoning": "Implementation quick reference principles that inform all checklists",
+                "commit": "bd0726b0b9755d226718ad026c289e43b38143be"
+              },
+              {
+                "file": "https://github.com/microsoft/amplifier-foundation/blob/bd0726b0b9755d226718ad026c289e43b38143be/context/MODULAR_DESIGN_PHILOSOPHY.md",
+                "reasoning": "Module design quick reference principles for module work checklist",
+                "commit": "bd0726b0b9755d226718ad026c289e43b38143be"
+              },
+              {
+                "file": "https://github.com/microsoft/amplifier-core/blob/3d2cec937ced74490dd787e8432ef85202f9a945/context/kernel-overview.md",
+                "reasoning": "Additional kernel guidance for quick reference checklist items",
+                "commit": "3d2cec937ced74490dd787e8432ef85202f9a945"
+              }
+            ],
+            "sections": [
+              {
+                "heading": "### For Kernel Work",
+                "level": 3,
+                "prompt": "Provide quick checklist for core system development work. Extract core system guidance from earlier sections and distill into brief, actionable checklist items. Focus on most critical questions and checks. Present as bulleted checklist in extremely concise tone.",
+                "sources": [
+                  {
+                    "file": "https://github.com/microsoft/amplifier-foundation/blob/bd0726b0b9755d226718ad026c289e43b38143be/context/KERNEL_PHILOSOPHY.md",
+                    "reasoning": "Kernel work principles that distill to essential checklist items",
+                    "commit": "bd0726b0b9755d226718ad026c289e43b38143be"
+                  }
+                ],
+                "sections": []
+              },
+              {
+                "heading": "### For Module Work",
+                "level": 3,
+                "prompt": "Provide quick checklist for module/extension development work. Extract module development guidance from earlier sections and distill into brief, actionable checklist items. Focus on most critical questions and checks. Present as bulleted checklist in extremely concise tone.",
+                "sources": [
+                  {
+                    "file": "https://github.com/microsoft/amplifier-foundation/blob/bd0726b0b9755d226718ad026c289e43b38143be/context/MODULAR_DESIGN_PHILOSOPHY.md",
+                    "reasoning": "Module design concepts that distill to essential module work checklist",
+                    "commit": "bd0726b0b9755d226718ad026c289e43b38143be"
+                  },
+                  {
+                    "file": "https://github.com/microsoft/amplifier-foundation/blob/bd0726b0b9755d226718ad026c289e43b38143be/context/IMPLEMENTATION_PHILOSOPHY.md",
+                    "reasoning": "Implementation guidance applicable to module work for practical checklist items",
+                    "commit": "bd0726b0b9755d226718ad026c289e43b38143be"
+                  }
+                ],
+                "sections": []
+              },
+              {
+                "heading": "### For Design Decisions",
+                "level": 3,
+                "prompt": "Provide quick checklist for design and architectural decisions. Extract design decision guidance from earlier sections and distill into brief, actionable questions and criteria. Focus on most critical decision points. Present as bulleted checklist of questions and criteria in extremely concise tone.",
+                "sources": [
+                  {
+                    "file": "https://github.com/microsoft/amplifier-foundation/blob/bd0726b0b9755d226718ad026c289e43b38143be/context/IMPLEMENTATION_PHILOSOPHY.md",
+                    "reasoning": "Design decision framework (5 questions) that forms the essential decision checklist",
+                    "commit": "bd0726b0b9755d226718ad026c289e43b38143be"
+                  }
+                ],
+                "sections": []
+              }
+            ]
+          },
+          {
+            "heading": "## Summary",
+            "level": 2,
+            "prompt": "Provide compelling closing that reinforces core philosophy and inspires adoption. Synthesize the essence of the philosophy into closing statement and return to opening theme or quote for coherence. Identify 3-5 key takeaways to reinforce and end with inspiring or thought-provoking statement. Present as concise prose paragraph(s) in compelling and memorable tone.",
+            "sources": [
+              {
+                "file": "https://github.com/microsoft/amplifier-foundation/blob/bd0726b0b9755d226718ad026c289e43b38143be/context/KERNEL_PHILOSOPHY.md",
+                "reasoning": "Closing philosophy statement and core quote 'The center stays still so the edges can move fast' that bookends the document",
+                "commit": "bd0726b0b9755d226718ad026c289e43b38143be"
+              },
+              {
+                "file": "https://github.com/microsoft/amplifier-core/blob/3d2cec937ced74490dd787e8432ef85202f9a945/context/kernel-overview.md",
+                "reasoning": "Core philosophical quote that provides closing coherence with opening",
+                "commit": "3d2cec937ced74490dd787e8432ef85202f9a945"
+              }
+            ],
+            "sections": []
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,12 +1,3 @@
-# doc-gen configuration file
-
-# Outline storage location (created automatically if doesn't exist)
 outline_storage: .doc-gen/cache
-
-# Registry: maps documentation files to their outlines
-# Add entries using: doc-gen register-outline <outline-path> <doc-path>
-outlines: {}
-  # Example entries:
-  # docs/api/overview.md: docs-api-overview/overview_outline.json
-  # docs/api/cli/index.md: docs-api-cli-index/index_outline.json
-  # docs/architecture/kernel.md: docs-architecture-kernel/kernel_outline.json
+outlines:
+  docs/DESIGN_PHILOSOPHY.md: docs-DESIGN_PHILOSOPHY/DESIGN_PHILOSOPHY_outline.json
