@@ -1,0 +1,548 @@
+name: "documentation-audit-comprehensive"
+description: |
+  Comprehensive documentation audit workflow with code comparison and strategic analysis.
+  
+  This recipe implements a systematic approach to documentation audits:
+  - Initial inventory with scope confirmation
+  - Comprehensive reading of all documentation
+  - Critical analysis questioning document types vs content
+  - Code structure comparison (code as ground truth)
+  - Code documentation quality assessment
+  - Strategic synthesis with justified recommendations
+  - Consolidated audit report with actionable next steps
+version: "1.0.0"
+tags: ["documentation", "audit", "analysis", "code-comparison", "systematic"]
+
+context:
+  docs_directory: "docs/"
+  source_directories: ["src/", "lib/"]
+  output_directory: "./"
+  repo_context: ""  # Optional: Additional context about repository purpose/domain
+
+# Staged recipe with approval gates for human-in-loop review
+stages:
+  # ==============================================================================
+  # STAGE 1: INVENTORY - Discover scope and get user confirmation
+  # ==============================================================================
+  - name: "inventory"
+    description: "Initial documentation inventory and scope assessment"
+    approval_required: true
+    approval_prompt: |
+      📋 INITIAL INVENTORY COMPLETE
+      
+      Review the documentation inventory above before proceeding.
+      
+      Before authorizing comprehensive reading, verify:
+      ✓ Is the scope correct? (All relevant docs included?)
+      ✓ Should any directories be excluded? (node_modules, build artifacts, etc.)
+      ✓ Does the file count seem reasonable?
+      ✓ Any concerns about file types or structure?
+      
+      Approving will trigger deep reading of ALL identified files.
+      This may take 15-30 minutes depending on documentation volume.
+    
+    steps:
+      - id: "discover-docs"
+        agent: "foundation:zen-architect"
+        mode: "ANALYZE"
+        prompt: |
+          🔍 TASK: Initial Documentation Inventory
+          
+          Perform a systematic discovery of all documentation in: {{docs_directory}}
+          
+          STEPS:
+          1. List ALL documentation files recursively
+          2. Categorize by apparent type (guides, references, architecture, API, etc.)
+          3. Note file sizes, extensions, and last modified dates
+          4. Identify directory structure and organization patterns
+          5. Flag obvious issues (empty files, suspiciously small/large, etc.)
+          
+          DELIVERABLE: Structured inventory report
+          
+          FORMAT:
+          ## Documentation Inventory
+          
+          ### Summary Statistics
+          - Total files: [count]
+          - Total size: [KB/MB]
+          - File types: [breakdown]
+          - Directory structure: [overview]
+          
+          ### Files by Category
+          [Group files by apparent purpose/type]
+          
+          ### Initial Quality Observations
+          - Empty or stub files
+          - Outdated markers (old dates, deprecated notices)
+          - Structural anomalies
+          - Missing expected documents
+          
+          ### Scope Assessment
+          - Estimated reading time: [X minutes]
+          - Complexity level: [low/medium/high]
+          - Recommended focus areas
+          
+          Be thorough. This inventory determines the scope of deep analysis.
+        output: "initial_inventory"
+        timeout: 300
+        on_error: "fail"
+
+  # ==============================================================================
+  # STAGE 2: DEEP READING - Comprehensive systematic reading
+  # ==============================================================================
+  - name: "deep-reading"
+    description: "Comprehensive reading of all documentation with critical analysis"
+    approval_required: false
+    
+    steps:
+      - id: "read-all-docs"
+        agent: "foundation:zen-architect"
+        mode: "ANALYZE"
+        prompt: |
+          📖 TASK: Comprehensive Documentation Reading
+          
+          Based on inventory: {{initial_inventory}}
+          
+          CRITICAL READING PRINCIPLES:
+          - Read EVERYTHING completely, not just summaries
+          - Don't trust document titles or labels (verify against actual content)
+          - Question stated purpose vs. actual content
+          - Look for gaps, redundancies, inconsistencies
+          - Assess organization and structure quality
+          - Note outdated or incorrect information
+          
+          FOR EACH DOCUMENT:
+          1. Full content review (read completely)
+          2. Purpose assessment: What does it claim to be? What is it actually?
+          3. Quality evaluation: Structure, clarity, completeness, accuracy
+          4. Critical observations: Problems, gaps, strengths, questions
+          5. Relationship to other docs: Overlaps, references, dependencies
+          
+          DELIVERABLE: Detailed reading notes
+          
+          FORMAT:
+          ## Comprehensive Reading Notes
+          
+          ### Document-by-Document Analysis
+          
+          #### [Document Name/Path]
+          - **Stated Purpose**: [What title/intro claims]
+          - **Actual Content**: [What it really contains]
+          - **Quality**: [Structure, clarity, completeness assessment]
+          - **Critical Observations**: 
+            - Strengths: [What works well]
+            - Issues: [Problems identified]
+            - Questions: [Unclear or concerning aspects]
+          - **Relationships**: [How it connects to other docs]
+          
+          [Repeat for each document]
+          
+          ### Cross-Cutting Observations
+          - Common patterns or conventions
+          - Systemic issues (affecting multiple docs)
+          - Documentation philosophy or approach
+          - Organizational logic (or lack thereof)
+          
+          BE THOROUGH. This is the foundation for all subsequent analysis.
+        output: "reading_notes"
+        timeout: 1800
+        on_error: "fail"
+
+  # ==============================================================================
+  # STAGE 3: CODE ANALYSIS - Compare docs to implementation reality
+  # ==============================================================================
+  - name: "code-analysis"
+    description: "Code structure analysis and comparison to documentation (code as ground truth)"
+    approval_required: false
+    
+    steps:
+      - id: "analyze-code-structure"
+        agent: "foundation:zen-architect"
+        mode: "ANALYZE"
+        prompt: |
+          🏗️ TASK: Code Structure Analysis and Doc Mapping
+          
+          Source directories: {{source_directories}}
+          Documentation reading: {{reading_notes}}
+          
+          PRINCIPLE: CODE IS GROUND TRUTH
+          Documentation should reflect implementation reality, not wishful thinking.
+          
+          ANALYSIS STEPS:
+          1. Map complete code architecture
+             - Major components/modules
+             - Key classes, functions, APIs
+             - Directory structure and organization
+             - Architecture patterns and design
+          
+          2. Compare to documentation structure
+             - What code is documented?
+             - What documentation exists without code?
+             - How well does doc structure mirror code structure?
+          
+          3. Identify gaps and misalignments
+             - Undocumented code areas (code without docs)
+             - Orphaned documentation (docs without code)
+             - Mismatches (docs claiming X, code does Y)
+             - Missing critical explanations
+          
+          DELIVERABLE: Code-to-Docs Mapping Report
+          
+          FORMAT:
+          ## Code Structure Analysis
+          
+          ### Code Architecture Overview
+          [Complete map of codebase structure]
+          
+          ### Documentation Coverage Map
+          
+          #### Well-Documented Areas
+          - [Component]: [What's documented and how well]
+          
+          #### Gaps (Code Without Docs)
+          - [Component]: [What's missing, why it matters]
+          
+          #### Orphaned Documentation
+          - [Doc]: [References non-existent or outdated code]
+          
+          #### Misalignments (Docs vs Reality)
+          - [Issue]: [What docs say vs what code does]
+          
+          ### Critical Missing Documentation
+          [Prioritized list of documentation gaps that matter most]
+          
+          Compare systematically. Be specific about gaps and impacts.
+        output: "code_structure_analysis"
+        timeout: 1200
+        on_error: "fail"
+      
+      - id: "assess-code-documentation"
+        agent: "foundation:explorer"
+        prompt: |
+          🔬 TASK: Code-Level Documentation Quality Assessment
+          
+          Directories: {{source_directories}}
+          Context: {{repo_context}}
+          
+          FOCUS: Code-level documentation quality
+          - Docstrings (classes, functions, modules)
+          - Inline comments
+          - Type hints and annotations
+          - Examples in docstrings
+          - API documentation completeness
+          
+          ASSESSMENT CRITERIA:
+          1. Coverage: What percentage has docstrings/comments?
+          2. Quality: Are they helpful, accurate, complete?
+          3. Consistency: Do they follow conventions?
+          4. Examples: Are there usage examples?
+          5. Currency: Are they up-to-date?
+          
+          DELIVERABLE: Code Documentation Quality Report
+          
+          Provide:
+          - Overall coverage assessment (%)
+          - Quality ratings by module/component
+          - Specific examples of good and bad documentation
+          - Concrete recommendations for improvement
+          - Priority areas needing attention
+          
+          Be specific with examples. Focus on actionable findings.
+        output: "code_docs_quality"
+        timeout: 900
+        on_error: "continue"
+
+  # ==============================================================================
+  # STAGE 4: STRATEGIC SYNTHESIS - Answer strategic questions with justification
+  # ==============================================================================
+  - name: "strategic-synthesis"
+    description: "Strategic analysis answering critical questions about documentation"
+    approval_required: false
+    
+    steps:
+      - id: "synthesize-findings"
+        agent: "foundation:zen-architect"
+        mode: "ARCHITECT"
+        prompt: |
+          🎯 TASK: Strategic Synthesis with Justified Recommendations
+          
+          INPUTS TO SYNTHESIZE:
+          - Inventory: {{initial_inventory}}
+          - Reading: {{reading_notes}}
+          - Code mapping: {{code_structure_analysis}}
+          - Code quality: {{code_docs_quality}}
+          
+          ANSWER THESE STRATEGIC QUESTIONS (with justification for each):
+          
+          ## 1. WHAT EXISTS AND WHY?
+          
+          - What documentation exists currently?
+          - Why was each piece likely created? (Purpose assessment)
+          - What's the organizational logic or philosophy?
+          - What patterns/conventions are followed?
+          - What assumptions were made?
+          
+          [Justify interpretations based on evidence]
+          
+          ## 2. WHAT'S MISSING AND WHY DOES IT MATTER?
+          
+          - What critical documentation is absent?
+          - Why is each gap problematic? (Impact analysis)
+          - What questions can't users answer?
+          - What misconceptions might result?
+          - What's the business/technical cost?
+          
+          [Prioritize gaps by impact, justify importance]
+          
+          ## 3. WHAT SHOULD CHANGE AND WHY?
+          
+          - What should be reorganized? (Why is current structure inadequate?)
+          - What should be consolidated? (Why is fragmentation problematic?)
+          - What should be split? (Why is aggregation confusing?)
+          - What should be rewritten? (Why is quality insufficient?)
+          - What should be deleted? (Why is it harmful/obsolete?)
+          
+          [Justify each recommendation with specific reasoning]
+          
+          ## 4. WHAT'S THE PRIORITY AND WHY?
+          
+          - What are the most critical issues? (Rank them)
+          - What's the recommended order of fixes? (Sequence matters)
+          - What's the rationale for prioritization?
+          - What are quick wins vs. long-term investments?
+          - What dependencies exist between changes?
+          
+          [Provide clear prioritization logic]
+          
+          ## 5. WHAT'S THE VISION?
+          
+          - What should the documentation look like when done?
+          - What principles should guide future documentation?
+          - How should it be maintained going forward?
+          
+          FORMAT: Executive analysis with clear sections for each question.
+          STYLE: Strategic, justified, actionable, specific.
+          
+          This synthesis will drive the final audit report. Be comprehensive.
+        output: "strategic_synthesis"
+        timeout: 1200
+        on_error: "fail"
+
+  # ==============================================================================
+  # STAGE 5: CONSOLIDATION - Final audit report with approval gate
+  # ==============================================================================
+  - name: "consolidation"
+    description: "Consolidate findings into comprehensive audit report"
+    approval_required: true
+    approval_prompt: |
+      📊 STRATEGIC SYNTHESIS COMPLETE
+      
+      Review the strategic analysis above before final report generation.
+      
+      The consolidated audit report will be written to:
+      {{output_directory}}/DOCUMENTATION_AUDIT.md
+      
+      Verify before approving:
+      ✓ Do the strategic recommendations make sense?
+      ✓ Are priorities correctly identified and justified?
+      ✓ Is anything critical missing from the analysis?
+      ✓ Are the "why" justifications compelling?
+      
+      Approving will generate the final comprehensive audit report file.
+    
+    steps:
+      - id: "create-audit-report"
+        agent: "foundation:zen-architect"
+        mode: "ARCHITECT"
+        prompt: |
+          📝 TASK: Generate Comprehensive Documentation Audit Report
+          
+          CONSOLIDATE ALL FINDINGS INTO FINAL REPORT:
+          - Inventory: {{initial_inventory}}
+          - Reading: {{reading_notes}}
+          - Code mapping: {{code_structure_analysis}}
+          - Code quality: {{code_docs_quality}}
+          - Strategy: {{strategic_synthesis}}
+          
+          REPORT STRUCTURE (Comprehensive):
+          
+          # DOCUMENTATION AUDIT REPORT
+          
+          Generated: [Date]
+          Scope: {{docs_directory}} and {{source_directories}}
+          
+          ---
+          
+          ## EXECUTIVE SUMMARY
+          
+          Brief overview (1-2 paragraphs):
+          - Audit scope and methodology
+          - Key findings at a glance
+          - Critical recommendations
+          - Overall assessment
+          
+          ---
+          
+          ## WHAT EXISTS (And Why)
+          
+          ### Current Documentation Inventory
+          [From initial_inventory - comprehensive list]
+          
+          ### Organizational Structure
+          - How docs are organized
+          - Patterns and conventions identified
+          - Apparent philosophy or approach
+          
+          ### Purpose Assessment by Document
+          [For major docs: stated purpose, actual content, quality]
+          
+          ### What Works Well
+          [Strengths identified during reading]
+          
+          ---
+          
+          ## WHAT'S MISSING (And Why It Matters)
+          
+          ### Undocumented Code Areas
+          [From code_structure_analysis - gaps in coverage]
+          - [Area]: Missing docs, impact, priority
+          
+          ### Missing Documentation Types
+          [Critical document types that don't exist]
+          - [Type]: What's missing, why needed, user impact
+          
+          ### Code Documentation Quality Issues
+          [From code_docs_quality - docstring/comment gaps]
+          
+          ### Impact Analysis
+          - Questions users can't answer
+          - Likely misconceptions or errors
+          - Productivity/quality costs
+          
+          ---
+          
+          ## STRATEGIC RECOMMENDATIONS (And Why)
+          
+          ### Documentation to Create
+          [Prioritized list with justification]
+          1. [Document]: Purpose, why critical, estimated effort
+          
+          ### Documentation to Reorganize
+          [What to move/consolidate/split and why]
+          - [Change]: Current state, proposed state, rationale
+          
+          ### Documentation to Improve
+          [Quality improvements needed]
+          - [Document]: Issues, recommended changes, priority
+          
+          ### Documentation to Archive/Delete
+          [What to remove and why]
+          - [Document]: Why obsolete/harmful, what replaces it
+          
+          ### Organizational Changes
+          [Structural improvements to doc system]
+          - [Change]: Current problem, proposed solution, benefits
+          
+          ---
+          
+          ## NEXT STEPS (And Why)
+          
+          ### Immediate Actions (Week 1)
+          1. [Action]: What, why, who, effort estimate
+          
+          ### Short-term Actions (Month 1)
+          [Priority fixes and critical gaps]
+          
+          ### Medium-term Actions (Quarter 1)
+          [Larger reorganizations and new content]
+          
+          ### Long-term Actions (Ongoing)
+          [Maintenance, process improvements, culture]
+          
+          ### Dependencies and Sequencing
+          [What must happen before what, and why]
+          
+          ### Success Criteria
+          [How to measure improvement]
+          
+          ---
+          
+          ## APPENDICES
+          
+          ### A. Detailed Reading Notes
+          [Full document-by-document analysis from reading_notes]
+          
+          ### B. Code-to-Docs Mapping
+          [Complete mapping from code_structure_analysis]
+          
+          ### C. Methodology
+          - How this audit was conducted
+          - Tools and approaches used
+          - Limitations and caveats
+          
+          ---
+          
+          ## DOCUMENTATION PRINCIPLES (Going Forward)
+          
+          [From strategic_synthesis - vision for documentation]
+          
+          Recommended principles for future documentation work:
+          - [Principle]: Description, rationale
+          
+          ---
+          
+          END OF AUDIT REPORT
+          
+          WRITING INSTRUCTIONS:
+          - Be comprehensive but well-organized
+          - Use clear headings and structure
+          - Provide specific examples throughout
+          - Justify all recommendations with "why"
+          - Make next steps actionable and concrete
+          - Professional tone but accessible
+          - Emphasize evidence-based conclusions
+          
+          Save this complete report to: {{output_directory}}/DOCUMENTATION_AUDIT.md
+        output: "final_audit_report"
+        timeout: 1200
+        on_error: "fail"
+
+# ==============================================================================
+# USAGE EXAMPLES
+# ==============================================================================
+#
+# Basic usage (defaults):
+#   amplifier recipes execute documentation-audit-comprehensive.yaml
+#
+# Custom paths:
+#   amplifier recipes execute documentation-audit-comprehensive.yaml \
+#     --context '{"docs_directory": "documentation/", "source_directories": ["core/", "plugins/"]}'
+#
+# With repository context:
+#   amplifier recipes execute documentation-audit-comprehensive.yaml \
+#     --context '{"repo_context": "Python-based data processing pipeline with extensible plugin architecture"}'
+#
+# Resume interrupted session:
+#   amplifier recipes resume <session_id>
+#
+# ==============================================================================
+# RECIPE CHARACTERISTICS
+# ==============================================================================
+#
+# Type: Staged recipe with approval gates
+# Estimated time: 45-90 minutes (varies with codebase size)
+# Resumable: Yes (approval gates provide checkpoints)
+# Parallelization: Some steps read multiple files (internal parallelization)
+# Dependencies: Requires foundation:zen-architect and foundation:explorer agents
+#
+# This recipe implements:
+# ✓ Systematic comprehensive reading (not skimming)
+# ✓ Critical questioning (don't trust labels)
+# ✓ Code as ground truth principle
+# ✓ Delegation when appropriate (explorer for code analysis)
+# ✓ Iterative refinement (inventory → analysis → synthesis → consolidation)
+# ✓ Human-in-loop at key decision points
+# ✓ Justified recommendations (always explain "why")
+# ✓ Comprehensive final report with actionable next steps
+#
+# ==============================================================================
